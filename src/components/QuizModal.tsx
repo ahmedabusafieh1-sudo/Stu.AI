@@ -400,7 +400,7 @@ export const QuizModal: React.FC = () => {
                   className="hidden"
                 />
 
-                {quizAttachments.length > 0 ? (
+                {quizAttachments.length > 0 && (
                   <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                     {quizAttachments.map((file, idx) => (
                       <div
@@ -430,15 +430,6 @@ export const QuizModal: React.FC = () => {
                         </button>
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border border-dashed border-[#3A3A3A] hover:border-[#666666] bg-[#171717]/60 rounded-xl p-3 text-center cursor-pointer transition-colors"
-                  >
-                    <p className="text-[#888888] text-xs">
-                      📸 يمكنك رفع صور لأوراق أو واجبات أو أجزاء من كتب لإنشاء الكويز منها مباشرة، أو الاعتماد على ملفات المحادثة.
-                    </p>
                   </div>
                 )}
               </div>
