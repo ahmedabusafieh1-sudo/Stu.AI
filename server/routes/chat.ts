@@ -348,9 +348,17 @@ chatRouter.post(
             .where(eq(sourceUnits.attachmentId, att.id))
             .orderBy(asc(sourceUnits.unitIndex));
 
-          const combinedUnitText = units
+          let combinedUnitText = units
             .map((u: any) => `[الوحدة/الصفحة ${u.unitIndex} (${u.unitType})]:\n${u.contentText}`)
             .join('\n\n');
+
+          // Safeguard against Google Gemini free tier 250,000 input tokens limit:
+          // Cap extracted text per attachment to ~100,000 characters (~25,000 tokens)
+          if (combinedUnitText.length > 100000) {
+            combinedUnitText =
+              combinedUnitText.slice(0, 100000) +
+              '\n\n[ملاحظة: تم تضمين الصفحات والوحدات الأولى من المستند الكبير لتناسب معايير المعالجة الدراسية]';
+          }
 
           attachmentsData.push({
             fileName: att.originalName,
