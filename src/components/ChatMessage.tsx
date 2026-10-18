@@ -213,65 +213,80 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               const isImage = att.mimeType?.startsWith('image/');
               const isUploading = att.status === 'uploading' || (!att.id && att.status !== 'failed');
               const imgSrc = att.previewUrl || (att.id ? `/api/attachments/${att.id}/content` : undefined);
+              const isReady = !isUploading && Boolean(att.id);
+              const openUrl = att.id ? `/api/attachments/${att.id}/content` : undefined;
+
+              const formatFileSize = (bytes: number) => {
+                if (!bytes || bytes <= 0) return '0 B';
+                if (bytes < 1024) return `${bytes} B`;
+                if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+                if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+                return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+              };
 
               if (isImage && imgSrc) {
                 return (
-                  <div
+                  <a
                     key={att.id || `att-${idx}`}
-                    className="group relative block overflow-hidden rounded-xl border border-[#3A3A3A] bg-[#171717] shadow-md"
+                    href={openUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`group relative block overflow-hidden rounded-xl border border-[#3A3A3A] bg-[#171717] shadow-md transition-all ${
+                      isReady ? 'hover:border-blue-400 cursor-pointer' : 'cursor-default'
+                    }`}
+                    title={isReady ? `انقر لفتح صورة ${att.originalName} بحجمها الكامل ↗` : undefined}
                   >
                     <img
                       src={imgSrc}
                       alt={att.originalName || 'صورة مرفقة'}
-                      className="w-24 h-24 sm:w-32 sm:h-32 object-cover"
+                      className="w-28 h-28 sm:w-36 sm:h-36 object-cover group-hover:scale-105 transition-transform duration-200"
                       loading="lazy"
                     />
-                    {isUploading ? (
+                    {isUploading && (
                       <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1.5 p-1 select-none">
                         <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
                         <span className="text-[10px] text-amber-300 font-medium text-center">جاري الإرسال...</span>
                       </div>
-                    ) : att.id ? (
-                      <a
-                        href={`/api/attachments/${att.id}/content`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                      >
-                        <ExternalLink className="w-5 h-5 text-white drop-shadow" />
-                      </a>
-                    ) : null}
-                  </div>
+                    )}
+                    {isReady && (
+                      <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-sm p-1 rounded-md text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                  </a>
                 );
               }
 
               return (
-                <div
+                <a
                   key={att.id || `att-${idx}`}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#232323] border border-[#3A3A3A] text-xs text-blue-300"
+                  href={openUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all ${
+                    isReady
+                      ? 'bg-[#232323] hover:bg-[#2F2F2F] border-[#3A3A3A] hover:border-blue-400/70 text-blue-300 hover:text-blue-200 cursor-pointer shadow-sm'
+                      : 'bg-[#1C1C1C] border-[#2A2A2A] text-gray-400 cursor-default'
+                  }`}
+                  title={isReady ? `انقر لفتح وتحميل ${att.originalName} مباشرة ↗` : undefined}
                 >
                   {isUploading ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-400 shrink-0" />
                   ) : (
-                    <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                    <FileText className="w-4 h-4 text-blue-400 shrink-0" />
                   )}
-                  <span className="truncate max-w-[140px]">{att.originalName}</span>
-                  <span className="text-[10px] text-[#888888]">
-                    ({(att.sizeBytes / 1024).toFixed(0)} KB)
-                  </span>
-                  {isUploading && <span className="text-[10px] text-amber-400 font-medium">(جاري الرفع)</span>}
-                  {!isUploading && att.id && (
-                    <a
-                      href={`/api/attachments/${att.id}/content`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hover:text-blue-200 ml-1"
-                      title="فتح المرفق"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                  <div className="flex flex-col min-w-0 pr-1">
+                    <span className="truncate max-w-[180px] sm:max-w-[260px] font-medium text-xs text-white">
+                      {att.originalName}
+                    </span>
+                    <span className="text-[10px] text-[#999999]">
+                      {formatFileSize(att.sizeBytes)} {isUploading ? '• جاري الرفع...' : '• انقر للفتح ↗'}
+                    </span>
+                  </div>
+                  {isReady && (
+                    <ExternalLink className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-200 mr-auto transition-colors shrink-0" />
                   )}
-                </div>
+                </a>
               );
             })}
           </div>

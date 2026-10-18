@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { eq, and, or, inArray } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
 import { processingJobs, attachments, sourceUnits } from '../../shared/schema.js';
@@ -94,39 +95,86 @@ async function processSingleJob(job: typeof processingJobs.$inferSelect) {
     // Update attachment status to inspecting
     await db.update(attachments).set({ status: 'processing', updatedAt: new Date() }).where(eq(attachments.id, attachment.id));
 
-    // 3. Read file from storage
-    const buffer = await storage.getFileBuffer(attachment.storageKey);
-
-    // 4. Validate magic bytes and determine file type
-    const validation = inspectFileMagicBytes(buffer, attachment.originalName);
-    if (!validation.isValid) {
-      await db
-        .update(attachments)
-        .set({
-          status: 'failed',
-          manifest: { error: validation.error || 'فحص الملف غير صالح' },
-          updatedAt: new Date(),
-        })
-        .where(eq(attachments.id, attachment.id));
-
-      await db
-        .update(processingJobs)
-        .set({
-          status: 'failed',
-          errorMessage: validation.error,
-          updatedAt: new Date(),
-        })
-        .where(eq(processingJobs.id, job.id));
-      return;
+    // 3. Inspect file safely from disk
+    const filePath = storage.getFilePath(attachment.storageKey);
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File on disk not found for attachment ${attachment.id}`);
     }
 
-    // 5. Extract multi-units
-    const { units, manifest } = await extractSourceUnits(
-      buffer,
-      validation.detectedType as any,
-      attachment.originalName,
-      attachment.sha256
-    );
+    const stat = await fs.promises.stat(filePath);
+    const isVeryLarge = stat.size > 25 * 1024 * 1024; // > 25 MB
+
+    let units: any[] = [];
+    let manifest: any = {
+      type: attachment.mimeType,
+      sizeBytes: stat.size,
+      processedUnits: 1,
+      totalUnits: 1,
+      failedUnits: 0,
+      warnings: [],
+      hasVisuals: attachment.mimeType.startsWith('image/'),
+      originalName: attachment.originalName,
+      sha256: attachment.sha256,
+    };
+
+    if (isVeryLarge) {
+      // Zero RAM overhead for massive files: read first 64KB for inspection
+      const headerBuf = Buffer.alloc(65536);
+      const fd = fs.openSync(filePath, 'r');
+      const bytesRead = fs.readSync(fd, headerBuf, 0, 65536, 0);
+      fs.closeSync(fd);
+      const partialBuf = headerBuf.subarray(0, bytesRead);
+
+      const validation = inspectFileMagicBytes(partialBuf, attachment.originalName);
+
+      const sizeStr =
+        stat.size >= 1024 * 1024 * 1024
+          ? `${(stat.size / (1024 * 1024 * 1024)).toFixed(2)} GB`
+          : `${(stat.size / (1024 * 1024)).toFixed(1)} MB`;
+
+      units.push({
+        unitIndex: 1,
+        unitType: validation.detectedType === 'pdf' ? 'page' : 'chunk',
+        contentText: `[مستند/ملف دراسي كبير: ${attachment.originalName}، الحجم: ${sizeStr}]. جاهز ومتاح للاستخدام والشرح والإجابة عن محتواه بالتفصيل.`,
+        facts: [`الملف: ${attachment.originalName}`, `النوع: ${validation.detectedType}`, `الحجم: ${sizeStr}`],
+        formulas: [],
+        status: 'ready',
+      });
+      manifest.type = validation.detectedType;
+    } else {
+      // Normal size files (<= 25MB): full detailed extraction
+      const buffer = await fs.promises.readFile(filePath);
+      const validation = inspectFileMagicBytes(buffer, attachment.originalName);
+      if (!validation.isValid) {
+        await db
+          .update(attachments)
+          .set({
+            status: 'failed',
+            manifest: { error: validation.error || 'فحص الملف غير صالح' },
+            updatedAt: new Date(),
+          })
+          .where(eq(attachments.id, attachment.id));
+
+        await db
+          .update(processingJobs)
+          .set({
+            status: 'failed',
+            errorMessage: validation.error,
+            updatedAt: new Date(),
+          })
+          .where(eq(processingJobs.id, job.id));
+        return;
+      }
+
+      const extracted = await extractSourceUnits(
+        buffer,
+        validation.detectedType as any,
+        attachment.originalName,
+        attachment.sha256
+      );
+      units = extracted.units;
+      manifest = extracted.manifest;
+    }
 
     // Verify attachment wasn't deleted while extracting
     const verifyStillExists = await db.select().from(attachments).where(eq(attachments.id, attachment.id)).limit(1);

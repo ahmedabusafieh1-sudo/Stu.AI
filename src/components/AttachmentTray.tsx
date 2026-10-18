@@ -63,7 +63,13 @@ export const AttachmentTray: React.FC = () => {
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium">{att.originalName}</div>
               <div className="flex items-center gap-1 text-[10px] text-[#888888]">
-                <span>{(att.sizeBytes / 1024).toFixed(0)} KB</span>
+                <span>
+                  {att.sizeBytes < 1024 * 1024
+                    ? `${(att.sizeBytes / 1024).toFixed(0)} KB`
+                    : att.sizeBytes < 1024 * 1024 * 1024
+                    ? `${(att.sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+                    : `${(att.sizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`}
+                </span>
                 {isUploading && (
                   <span className="flex items-center text-amber-400">
                     <Loader2 className="w-2.5 h-2.5 animate-spin mr-0.5" />

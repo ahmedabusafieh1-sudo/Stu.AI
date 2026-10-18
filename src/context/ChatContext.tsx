@@ -193,23 +193,20 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fileList = Array.from(files);
     if (fileList.length === 0) return;
 
-    const MAX_DOC_SIZE = 100 * 1024 * 1024; // 100 MB
-    const MAX_IMG_SIZE = 50 * 1024 * 1024; // 50 MB
+    const MAX_FILE_SIZE = 100 * 1024 * 1024 * 1024; // 100 GB max
 
     const oversizedItems: AttachmentItem[] = [];
     const validFiles: { file: File; tempKey: string }[] = [];
 
     fileList.forEach((f) => {
-      const isImg = f.type.startsWith('image/');
-      const limit = isImg ? MAX_IMG_SIZE : MAX_DOC_SIZE;
-      if (f.size > limit) {
+      if (f.size > MAX_FILE_SIZE) {
         oversizedItems.push({
           file: f,
           originalName: f.name,
           mimeType: f.type || 'application/octet-stream',
           sizeBytes: f.size,
           uploadStatus: 'failed',
-          error: `حجم الملف (${(f.size / (1024 * 1024)).toFixed(1)} MB) يتجاوز الحد الأقصى (${isImg ? 50 : 100} MB)`,
+          error: `حجم الملف (${(f.size / (1024 * 1024 * 1024)).toFixed(1)} GB) يتجاوز الحد الأقصى (100 GB)`,
         });
       } else {
         const tempKey = `att_${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${f.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;

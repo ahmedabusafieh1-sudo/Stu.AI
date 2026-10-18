@@ -46,7 +46,12 @@ class LocalDiskStorage implements StorageProvider {
     if (!fs.existsSync(parentDir)) {
       fs.mkdirSync(parentDir, { recursive: true });
     }
-    await fs.promises.copyFile(sourcePath, fullPath);
+    try {
+      await fs.promises.rename(sourcePath, fullPath);
+    } catch {
+      await fs.promises.copyFile(sourcePath, fullPath);
+      await fs.promises.unlink(sourcePath).catch(() => {});
+    }
     return key;
   }
 
