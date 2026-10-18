@@ -9,13 +9,32 @@ import { inspectFileMagicBytes } from '../services/extractor.js';
 import { enqueueAttachmentJob } from '../services/jobs.js';
 import { requireAuth, requireVerified } from '../middleware/auth.js';
 
+import fs from 'fs';
+import path from 'path';
+
 export const attachmentsRouter = Router();
 
-// Configure Multer memory storage with 50MB single file limit
+const tempUploadDir = path.resolve(process.cwd(), './data/uploads_temp');
+if (!fs.existsSync(tempUploadDir)) {
+  fs.mkdirSync(tempUploadDir, { recursive: true });
+}
+
+// Stream uploads directly to disk chunks to use near-zero RAM
+const diskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, tempUploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    cb(null, `${unique}_${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`);
+  },
+});
+
+// Configure Multer with 100MB per file limit
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: diskStorage,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50 MB max per file
+    fileSize: 100 * 1024 * 1024, // 100 MB max per file
     files: 20, // 20 files max per request
   },
 });
@@ -32,7 +51,7 @@ attachmentsRouter.post(
       if (err) {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({
-            error: 'حجم الملف يتجاوز الحد الأقصى المسموح به (50 ميجابايت للمستندات / 20 ميجابايت للصور).',
+            error: 'حجم الملف يتجاوز الحد الأقصى المسموح به (100 ميجابايت للمستندات / 50 ميجابايت للصور).',
           });
         }
         if (err.code === 'LIMIT_FILE_COUNT') {
@@ -51,10 +70,14 @@ attachmentsRouter.post(
       return res.status(400).json({ error: 'لم يتم اختيار أي ملفات للرفع.' });
     }
 
-    // Check total payload size <= 100 MB
+    // Check total payload size <= 200 MB
     const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
-    if (totalBytes > 100 * 1024 * 1024) {
-      return res.status(400).json({ error: 'إجمالي حجم المرفقات يتجاوز الحد الأقصى المسموح به (100 ميجابايت).' });
+    if (totalBytes > 200 * 1024 * 1024) {
+      // Clean up temp files
+      for (const f of files) {
+        if (f.path) fs.promises.unlink(f.path).catch(() => {});
+      }
+      return res.status(400).json({ error: 'إجمالي حجم المرفقات يتجاوز الحد الأقصى المسموح به (200 ميجابايت).' });
     }
 
     const { db } = await getDb();
@@ -63,25 +86,48 @@ attachmentsRouter.post(
 
     for (const file of files) {
       try {
+        // Read first 4KB of file header from disk for magic bytes inspection (Zero RAM overhead)
+        const headerBuffer = Buffer.alloc(4096);
+        const fd = fs.openSync(file.path, 'r');
+        const bytesRead = fs.readSync(fd, headerBuffer, 0, 4096, 0);
+        fs.closeSync(fd);
+        const fileHeader = headerBuffer.subarray(0, bytesRead);
+
+        // Compute sha256 via streaming (Zero RAM overhead)
+        const hash = crypto.createHash('sha256');
+        await new Promise<void>((resolve, reject) => {
+          const stream = fs.createReadStream(file.path);
+          stream.on('data', (chunk) => hash.update(chunk));
+          stream.on('end', () => resolve());
+          stream.on('error', reject);
+        });
+        const fileSha256 = hash.digest('hex');
+
         // Validate magic bytes
-        const validation = inspectFileMagicBytes(file.buffer, file.originalname);
+        const validation = inspectFileMagicBytes(fileHeader, file.originalname);
+        validation.sha256 = fileSha256;
+
         if (!validation.isValid) {
           errors.push(`${file.originalname}: ${validation.error}`);
+          await fs.promises.unlink(file.path).catch(() => {});
           continue;
         }
 
-        // Additional image size check (20 MB limit for images)
-        if (validation.detectedType === 'image' && file.size > 20 * 1024 * 1024) {
-          errors.push(`${file.originalname}: حجم الصورة يتجاوز الحد الأقصى للصور (20 ميجابايت).`);
+        // Additional image size check (50 MB limit for images)
+        if (validation.detectedType === 'image' && file.size > 50 * 1024 * 1024) {
+          errors.push(`${file.originalname}: حجم الصورة يتجاوز الحد الأقصى للصور (50 ميجابايت).`);
+          await fs.promises.unlink(file.path).catch(() => {});
           continue;
         }
 
         // Generate persistent storage key
         const fileExt = file.originalname.split('.').pop() || 'bin';
-        const storageKey = `users/${req.user!.id}/${Date.now()}_${validation.sha256.slice(0, 12)}.${fileExt}`;
+        const storageKey = `users/${req.user!.id}/${Date.now()}_${fileSha256.slice(0, 12)}.${fileExt}`;
 
-        // Save to persistent private storage
-        await storage.saveFile(storageKey, file.buffer, validation.detectedMime);
+        // Save directly from disk path to persistent storage
+        await storage.saveFileFromPath(storageKey, file.path, validation.detectedMime);
+        // Remove temp upload file
+        await fs.promises.unlink(file.path).catch(() => {});
 
         // Insert database record
         const inserted = await db
@@ -92,7 +138,7 @@ attachmentsRouter.post(
             originalName: file.originalname,
             mimeType: validation.detectedMime,
             sizeBytes: file.size,
-            sha256: validation.sha256,
+            sha256: fileSha256,
             status: 'inspecting',
             manifest: { status: 'inspecting' },
           })
@@ -114,6 +160,9 @@ attachmentsRouter.post(
       } catch (err: any) {
         console.error('[UPLOAD_FILE_ERR]', err);
         errors.push(`${file.originalname}: فشل حفظ الملف: ${err.message}`);
+        if (file.path) {
+          await fs.promises.unlink(file.path).catch(() => {});
+        }
       }
     }
 

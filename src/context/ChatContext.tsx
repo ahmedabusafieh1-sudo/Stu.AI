@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 
 export interface AttachmentItem {
   id?: string;
+  tempKey?: string;
   file?: File;
   originalName: string;
   mimeType: string;
@@ -27,6 +28,7 @@ export interface ChatMessage {
     mimeType: string;
     sizeBytes: number;
     status: string;
+    previewUrl?: string;
   }[];
   createdAt: string;
 }
@@ -83,6 +85,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const inFlightUploadsRef = useRef<
+    Map<string, Promise<{ id: string; originalName: string; mimeType: string; sizeBytes: number; status: string } | null>>
+  >(new Map());
 
   // Load conversations when authenticated
   useEffect(() => {
@@ -188,11 +193,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fileList = Array.from(files);
     if (fileList.length === 0) return;
 
-    const MAX_DOC_SIZE = 50 * 1024 * 1024; // 50 MB
-    const MAX_IMG_SIZE = 20 * 1024 * 1024; // 20 MB
+    const MAX_DOC_SIZE = 100 * 1024 * 1024; // 100 MB
+    const MAX_IMG_SIZE = 50 * 1024 * 1024; // 50 MB
 
     const oversizedItems: AttachmentItem[] = [];
-    const validFiles: File[] = [];
+    const validFiles: { file: File; tempKey: string }[] = [];
 
     fileList.forEach((f) => {
       const isImg = f.type.startsWith('image/');
@@ -204,20 +209,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           mimeType: f.type || 'application/octet-stream',
           sizeBytes: f.size,
           uploadStatus: 'failed',
-          error: `حجم الملف (${(f.size / (1024 * 1024)).toFixed(1)} MB) يتجاوز الحد الأقصى (${isImg ? 20 : 50} MB)`,
+          error: `حجم الملف (${(f.size / (1024 * 1024)).toFixed(1)} MB) يتجاوز الحد الأقصى (${isImg ? 50 : 100} MB)`,
         });
       } else {
-        validFiles.push(f);
+        const tempKey = `att_${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${f.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        validFiles.push({ file: f, tempKey });
       }
     });
 
     // Create preliminary UI items for valid files
-    const validUiItems: AttachmentItem[] = validFiles.map((f) => ({
-      file: f,
-      originalName: f.name,
-      mimeType: f.type || 'application/octet-stream',
-      sizeBytes: f.size,
-      previewUrl: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined,
+    const validUiItems: AttachmentItem[] = validFiles.map(({ file, tempKey }) => ({
+      tempKey,
+      file,
+      originalName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      sizeBytes: file.size,
+      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
       uploadStatus: 'uploading',
     }));
 
@@ -227,17 +234,38 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Send formData for valid files
     const formData = new FormData();
-    validFiles.forEach((f) => formData.append('files', f));
+    validFiles.forEach(({ file }) => formData.append('files', file));
 
-    try {
-      const res = await fetch('/api/attachments/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
+    const uploadBatchPromise = (async () => {
+      try {
+        const res = await fetch('/api/attachments/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+        if (res.ok && data.attachments) {
+          return data.attachments as { id: string; originalName: string; mimeType: string; sizeBytes: number; status: string }[];
+        }
+        throw new Error(data.error || 'فشل رفع الملفات');
+      } catch (err: any) {
+        console.error('Upload fetch error:', err);
+        throw err;
+      }
+    })();
 
-      if (res.ok && data.attachments) {
-        const uploadedList = data.attachments;
+    // Store per-file promises so sendMessage can await them if sent early
+    validFiles.forEach(({ file, tempKey }) => {
+      const singlePromise = uploadBatchPromise
+        .then((uploadedList) => {
+          const matched = uploadedList.find((u) => u.originalName === file.name);
+          return matched || null;
+        })
+        .catch((_) => null);
+      inFlightUploadsRef.current.set(tempKey, singlePromise);
+    });
+
+    uploadBatchPromise
+      .then((uploadedList) => {
         setPendingAttachments((prev) =>
           prev.map((item) => {
             const matched = uploadedList.find((u: any) => u.originalName === item.originalName);
@@ -251,35 +279,21 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return item;
           })
         );
-      } else {
-        // Mark these validFiles as failed with server error
+      })
+      .catch((err) => {
         setPendingAttachments((prev) =>
           prev.map((item) => {
-            if (validFiles.some((vf) => vf.name === item.originalName && item.uploadStatus === 'uploading')) {
+            if (validFiles.some((vf) => vf.tempKey === item.tempKey && item.uploadStatus === 'uploading')) {
               return {
                 ...item,
                 uploadStatus: 'failed',
-                error: data.error || 'فشل رفع الملف',
+                error: err.message || 'فشل رفع الملف',
               };
             }
             return item;
           })
         );
-      }
-    } catch (err: any) {
-      setPendingAttachments((prev) =>
-        prev.map((item) => {
-          if (validFiles.some((vf) => vf.name === item.originalName && item.uploadStatus === 'uploading')) {
-            return {
-              ...item,
-              uploadStatus: 'failed',
-              error: err.message || 'فشل الاتصال بالخادم أثناء الرفع',
-            };
-          }
-          return item;
-        })
-      );
-    }
+      });
   };
 
   const removePendingAttachment = (index: number) => {
@@ -303,36 +317,81 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!targetConvId) return;
     }
 
-    const readyAttachmentIds = pendingAttachments
-      .filter((a) => a.id && a.uploadStatus === 'ready')
-      .map((a) => a.id!);
+    // 1. Snapshot all pending attachments that aren't marked as failed
+    const attachmentsToProcess = pendingAttachments.filter((a) => a.uploadStatus !== 'failed');
+    if (!content.trim() && attachmentsToProcess.length === 0) return;
 
-    const userMessageAttachments = pendingAttachments.map((a) => ({
+    // 2. Clear input attachments immediately so the tray is empty and ready
+    clearPendingAttachments();
+
+    // 3. Optimistically append user message to UI immediately with previews
+    const tempUserMsgId = `temp-${Date.now()}`;
+    const initialUserAttachments = attachmentsToProcess.map((a) => ({
       id: a.id || '',
       originalName: a.originalName,
       mimeType: a.mimeType,
       sizeBytes: a.sizeBytes,
       status: a.uploadStatus,
+      previewUrl: a.previewUrl,
     }));
 
-    // Optimistically append user message to UI
     const tempUserMsg: ChatMessage = {
-      id: `temp-${Date.now()}`,
+      id: tempUserMsgId,
       conversationId: targetConvId,
       role: 'user',
       content: content.trim(),
       status: 'complete',
       sequence: messages.length + 1,
-      attachments: userMessageAttachments,
+      attachments: initialUserAttachments,
       createdAt: new Date().toISOString(),
     };
 
     setMessages((prev) => [...prev, tempUserMsg]);
-    clearPendingAttachments();
 
-    // Prepare streaming assistant message
+    // 4. Prepare streaming assistant message state
     setIsStreaming(true);
     setStreamingContent('');
+
+    // 5. Await in-flight uploads for any attachment still uploading
+    const resolvedAttachmentIds: string[] = [];
+    const updatedUserAttachments = [...initialUserAttachments];
+
+    for (let i = 0; i < attachmentsToProcess.length; i++) {
+      const att = attachmentsToProcess[i];
+      if (att.id && att.uploadStatus === 'ready') {
+        resolvedAttachmentIds.push(att.id);
+      } else if (att.uploadStatus === 'uploading' && att.tempKey) {
+        const uploadPromise = inFlightUploadsRef.current.get(att.tempKey);
+        if (uploadPromise) {
+          try {
+            const uploaded = await uploadPromise;
+            if (uploaded && uploaded.id) {
+              resolvedAttachmentIds.push(uploaded.id);
+              updatedUserAttachments[i] = {
+                ...updatedUserAttachments[i],
+                id: uploaded.id,
+                status: 'ready',
+              };
+            } else {
+              updatedUserAttachments[i] = {
+                ...updatedUserAttachments[i],
+                status: 'failed',
+              };
+            }
+          } catch {
+            updatedUserAttachments[i] = {
+              ...updatedUserAttachments[i],
+              status: 'failed',
+            };
+          }
+        }
+      }
+    }
+
+    // Update the optimistic message in state with the resolved IDs
+    setMessages((prev) =>
+      prev.map((m) => (m.id === tempUserMsgId ? { ...m, attachments: updatedUserAttachments } : m))
+    );
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -343,7 +402,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content,
-          attachmentIds: readyAttachmentIds,
+          attachmentIds: resolvedAttachmentIds,
           actionType,
           useSearchGrounding,
           idempotencyKey: `msg-${Date.now()}-${Math.random()}`,

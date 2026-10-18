@@ -12,8 +12,10 @@ if (!fs.existsSync(LOCAL_STORAGE_DIR)) {
 
 export interface StorageProvider {
   saveFile(key: string, buffer: Buffer, mimeType: string): Promise<string>;
+  saveFileFromPath(key: string, sourcePath: string, mimeType: string): Promise<string>;
   getFileBuffer(key: string): Promise<Buffer>;
   getFileStream(key: string): Promise<Readable>;
+  getFilePath(key: string): string;
   deleteFile(key: string): Promise<void>;
   fileExists(key: string): Promise<boolean>;
 }
@@ -32,6 +34,20 @@ class LocalDiskStorage implements StorageProvider {
     // Prevent path traversal
     const safeKey = key.replace(/\.\./g, '').replace(/^[/\\]+/, '');
     return path.join(this.baseDir, safeKey);
+  }
+
+  getFilePath(key: string): string {
+    return this.resolvePath(key);
+  }
+
+  async saveFileFromPath(key: string, sourcePath: string, _mimeType: string): Promise<string> {
+    const fullPath = this.resolvePath(key);
+    const parentDir = path.dirname(fullPath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+    await fs.promises.copyFile(sourcePath, fullPath);
+    return key;
   }
 
   async saveFile(key: string, buffer: Buffer, _mimeType: string): Promise<string> {

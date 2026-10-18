@@ -12,6 +12,7 @@ import {
   File,
   Paperclip,
   Key,
+  Loader2,
 } from 'lucide-react';
 import { ChatMessage as ChatMessageType, useChat } from '../context/ChatContext';
 import { useAuth } from '../context/AuthContext';
@@ -208,43 +209,69 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         {/* User Attachments Preview */}
         {message.attachments && message.attachments.length > 0 && (
           <div className={`flex flex-wrap gap-2.5 ${message.content?.trim() ? 'mb-3 pb-2.5 border-b border-[#3A3A3A]' : ''}`}>
-            {message.attachments.map((att) => {
+            {message.attachments.map((att, idx) => {
               const isImage = att.mimeType?.startsWith('image/');
-              if (isImage) {
+              const isUploading = att.status === 'uploading' || (!att.id && att.status !== 'failed');
+              const imgSrc = att.previewUrl || (att.id ? `/api/attachments/${att.id}/content` : undefined);
+
+              if (isImage && imgSrc) {
                 return (
-                  <a
-                    key={att.id}
-                    href={`/api/attachments/${att.id}/content`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="group relative block overflow-hidden rounded-xl border border-[#3A3A3A] hover:border-blue-400/60 transition-all shadow-md bg-[#171717]"
+                  <div
+                    key={att.id || `att-${idx}`}
+                    className="group relative block overflow-hidden rounded-xl border border-[#3A3A3A] bg-[#171717] shadow-md"
                   >
                     <img
-                      src={`/api/attachments/${att.id}/content`}
-                      alt="صورة مرفقة"
-                      className="w-24 h-24 sm:w-32 sm:h-32 object-cover group-hover:scale-105 transition-transform duration-200"
+                      src={imgSrc}
+                      alt={att.originalName || 'صورة مرفقة'}
+                      className="w-24 h-24 sm:w-32 sm:h-32 object-cover"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <ExternalLink className="w-5 h-5 text-white drop-shadow" />
-                    </div>
-                  </a>
+                    {isUploading ? (
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1.5 p-1 select-none">
+                        <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+                        <span className="text-[10px] text-amber-300 font-medium text-center">جاري الإرسال...</span>
+                      </div>
+                    ) : att.id ? (
+                      <a
+                        href={`/api/attachments/${att.id}/content`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        <ExternalLink className="w-5 h-5 text-white drop-shadow" />
+                      </a>
+                    ) : null}
+                  </div>
                 );
               }
+
               return (
-                <a
-                  key={att.id}
-                  href={`/api/attachments/${att.id}/content`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#232323] hover:bg-[#2B2B2B] border border-[#3A3A3A] text-xs text-blue-300 transition-colors"
+                <div
+                  key={att.id || `att-${idx}`}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#232323] border border-[#3A3A3A] text-xs text-blue-300"
                 >
-                  <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                  {isUploading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+                  ) : (
+                    <Paperclip className="w-3.5 h-3.5 shrink-0" />
+                  )}
                   <span className="truncate max-w-[140px]">{att.originalName}</span>
                   <span className="text-[10px] text-[#888888]">
                     ({(att.sizeBytes / 1024).toFixed(0)} KB)
                   </span>
-                </a>
+                  {isUploading && <span className="text-[10px] text-amber-400 font-medium">(جاري الرفع)</span>}
+                  {!isUploading && att.id && (
+                    <a
+                      href={`/api/attachments/${att.id}/content`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:text-blue-200 ml-1"
+                      title="فتح المرفق"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
               );
             })}
           </div>
