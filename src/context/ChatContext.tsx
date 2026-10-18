@@ -347,8 +347,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const dataStr = dataMatch ? dataMatch[1] : '';
 
             if (dataStr) {
+              let parsed: any = null;
               try {
-                const parsed = JSON.parse(dataStr);
+                parsed = JSON.parse(dataStr);
+              } catch {
+                // Ignore parse errors on raw tokens
+              }
+
+              if (parsed) {
                 if (eventType === 'start') {
                   serverAssistantMsgId = parsed.assistantMessageId;
                 } else if (eventType === 'chunk') {
@@ -362,10 +368,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   capturedCitations = parsed.citations || [];
                   capturedGrounding = parsed.searchGrounding || capturedGrounding;
                 } else if (eventType === 'error') {
-                  throw new Error(parsed.error);
+                  throw new Error(parsed.error || 'حدث خطأ في خدمة الذكاء الاصطناعي.');
                 }
-              } catch (parseErr) {
-                // Ignore parse errors on raw tokens
               }
             }
           }

@@ -108,12 +108,12 @@ ${actionDirective}
 // ----------------------------------------------------
 export function getModelName(type: 'fast' | 'accurate' | 'transcribe' = 'fast'): string {
   if (type === 'transcribe') {
-    return process.env.GEMINI_MODEL_TRANSCRIBE || process.env.GEMINI_MODEL_FAST || 'gemini-3.8-flash';
+    return process.env.GEMINI_MODEL_TRANSCRIBE || process.env.GEMINI_MODEL_FAST || 'gemini-3.5-flash-lite';
   }
   if (type === 'accurate') {
-    return process.env.GEMINI_MODEL_ACCURATE || 'gemini-3.8-flash';
+    return process.env.GEMINI_MODEL_ACCURATE || 'gemini-3.5-flash-lite';
   }
-  return process.env.GEMINI_MODEL_FAST || 'gemini-3.8-flash';
+  return process.env.GEMINI_MODEL_FAST || 'gemini-3.5-flash-lite';
 }
 
 export function isGeminiConfigured(): boolean {
@@ -169,28 +169,18 @@ export async function streamGeminiChat(
   const modelName = getModelName(options.modelType || 'fast');
   const systemInstruction = buildSystemInstruction(options.actionType, options.preferredLanguage);
 
+  const candidateModels = [
+    modelName,
+    'gemini-3.5-flash-lite',
+    'gemini-3.8-flash',
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
   return await retryWithBackoff(async () => {
     const genAI = new GoogleGenerativeAI(apiKey);
-
-    // Tools setup: enable Google Search Grounding if requested
     const tools = options.useSearchGrounding ? [{ googleSearch: {} } as any] : undefined;
-
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      systemInstruction: {
-        role: 'system',
-        parts: [{ text: systemInstruction }],
-      },
-      tools,
-      generationConfig: {
-        temperature: options.temperature ?? (options.actionType === 'reexplain' ? 0.7 : 0.4),
-      },
-    });
 
     // Format history for Google Gen AI SDK
     const contents: any[] = [];
-
-    // Add prior conversation messages
     for (const msg of conversationHistory) {
       contents.push({
         role: msg.role === 'assistant' ? 'model' : 'user',
@@ -198,13 +188,9 @@ export async function streamGeminiChat(
       });
     }
 
-    // Build parts for the current new message
     const currentParts: any[] = [];
-
-    // Add attachments
     for (const att of attachmentsData) {
       if (att.buffer && att.mimeType.startsWith('image/')) {
-        // Send image as inlineData for visual inspection
         currentParts.push({
           inlineData: {
             mimeType: att.mimeType,
@@ -212,16 +198,13 @@ export async function streamGeminiChat(
           },
         });
       }
-
       if (att.extractedText) {
-        // Add extracted multi-unit document content
         currentParts.push({
           text: `\n[محتوى المرفق المستخرج: ${att.fileName}]\n${att.extractedText}\n[نهاية مرفق: ${att.fileName}]\n`,
         });
       }
     }
 
-    // Add the user's prompt text
     const promptText = newPrompt.trim()
       ? newPrompt
       : 'يرجى مراجعة وشرح المرفقات المرفقة بالتفصيل، وتوضيح المفاهيم الأساسية وحل أي مسائل واردة فيها.';
@@ -229,68 +212,88 @@ export async function streamGeminiChat(
     currentParts.push({ text: promptText });
     contents.push({ role: 'user', parts: currentParts });
 
-    // Stream generation
-    const responseStream = await model.generateContentStream({ contents });
+    let lastError: any = null;
+    for (const currentModelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: currentModelName,
+          systemInstruction: {
+            role: 'system',
+            parts: [{ text: systemInstruction }],
+          },
+          tools,
+          generationConfig: {
+            temperature: options.temperature ?? (options.actionType === 'reexplain' ? 0.7 : 0.4),
+          },
+        });
 
-    let fullText = '';
-    const groundingSources: GroundingSource[] = [];
-    const searchQueries: string[] = [];
+        // Stream generation
+        const responseStream = await model.generateContentStream({ contents });
+        let fullText = '';
+        const groundingSources: GroundingSource[] = [];
+        const searchQueries: string[] = [];
 
-    for await (const chunk of responseStream.stream) {
-      const chunkText = chunk.text();
-      if (chunkText) {
-        fullText += chunkText;
-        callbacks.onChunk(chunkText);
-      }
-
-      // Extract Grounding metadata if available from Google Search
-      const candidates = (chunk as any).candidates;
-      if (candidates && candidates[0]?.groundingMetadata) {
-        const meta = candidates[0].groundingMetadata;
-        if (meta.webSearchQueries && Array.isArray(meta.webSearchQueries)) {
-          for (const q of meta.webSearchQueries) {
-            if (!searchQueries.includes(q)) searchQueries.push(q);
+        for await (const chunk of responseStream.stream) {
+          const chunkText = chunk.text();
+          if (chunkText) {
+            fullText += chunkText;
+            callbacks.onChunk(chunkText);
           }
-        }
-        if (meta.groundingChunks && Array.isArray(meta.groundingChunks)) {
-          for (const gChunk of meta.groundingChunks) {
-            if (gChunk.web?.uri) {
-              const url = gChunk.web.uri;
-              if (!groundingSources.some((s) => s.url === url)) {
-                groundingSources.push({
-                  title: gChunk.web.title || new URL(url).hostname,
-                  url,
-                });
+
+          const candidates = (chunk as any).candidates;
+          if (candidates && candidates[0]?.groundingMetadata) {
+            const meta = candidates[0].groundingMetadata;
+            if (meta.webSearchQueries && Array.isArray(meta.webSearchQueries)) {
+              for (const q of meta.webSearchQueries) {
+                if (!searchQueries.includes(q)) searchQueries.push(q);
+              }
+            }
+            if (meta.groundingChunks && Array.isArray(meta.groundingChunks)) {
+              for (const gc of meta.groundingChunks) {
+                if (gc.web?.uri) {
+                  groundingSources.push({
+                    title: gc.web.title || gc.web.uri,
+                    url: gc.web.uri,
+                  });
+                }
               }
             }
           }
         }
+
+        const response = await responseStream.response;
+        const usage = response.usageMetadata;
+        if (usage && callbacks.onUsage) {
+          callbacks.onUsage({
+            promptTokens: usage.promptTokenCount || 0,
+            candidateTokens: usage.candidatesTokenCount || 0,
+            totalTokens: usage.totalTokenCount || 0,
+          });
+        }
+
+        let searchGrounding = undefined;
+        if (groundingSources.length > 0 || searchQueries.length > 0) {
+          searchGrounding = {
+            sources: groundingSources,
+            queries: searchQueries,
+          };
+          if (callbacks.onGrounding) {
+            callbacks.onGrounding(groundingSources, searchQueries);
+          }
+        }
+
+        return { fullText, searchGrounding };
+      } catch (err: any) {
+        lastError = err;
+        const isQuotaOrNotFound = err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('404') || err?.message?.includes('RESOURCE_EXHAUSTED');
+        if (isQuotaOrNotFound && currentModelName !== candidateModels[candidateModels.length - 1]) {
+          console.warn(`[GEMINI_FALLBACK] Model ${currentModelName} failed (${err.message}). Trying fallback model...`);
+          continue;
+        }
+        throw err;
       }
     }
-
-    // Usage tracking
-    const response = await responseStream.response;
-    const usage = response.usageMetadata;
-    if (usage && callbacks.onUsage) {
-      callbacks.onUsage({
-        promptTokens: usage.promptTokenCount || 0,
-        candidateTokens: usage.candidatesTokenCount || 0,
-        totalTokens: usage.totalTokenCount || 0,
-      });
-    }
-
-    let searchGrounding = undefined;
-    if (groundingSources.length > 0 || searchQueries.length > 0) {
-      searchGrounding = {
-        sources: groundingSources,
-        queries: searchQueries,
-      };
-      if (callbacks.onGrounding) {
-        callbacks.onGrounding(groundingSources, searchQueries);
-      }
-    }
-
-    return { fullText, searchGrounding };
+    throw lastError;
   });
 }
 
