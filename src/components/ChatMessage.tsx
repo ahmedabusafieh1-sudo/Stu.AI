@@ -162,8 +162,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isGeminiMissing =
     isFailed &&
     (message.content.includes('GEMINI_API_KEY') ||
-      message.content.includes('خدمة الذكاء الاصطناعي') ||
-      message.content.includes('Gemini'));
+      message.content.includes('غير مضبوطة') ||
+      message.content.includes('لم يتم إدخال'));
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -305,7 +305,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         )}
 
         {/* Action Toolbar for Assistant Messages */}
-        {!isUser && !isFailed && message.status === 'complete' && (
+        {!isUser && !isFailed && message.status === 'complete' && Boolean(message.content?.trim()) && (
           <div className="mt-2 pt-1.5 flex items-center justify-end border-t border-[#2B2B2B]/60 text-xs text-[#888888]">
             {/* Copy Button */}
             <button

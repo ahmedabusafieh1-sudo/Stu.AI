@@ -377,19 +377,31 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Add final completed assistant message to messages
-      const finalAssistantMsg: ChatMessage = {
-        id: serverAssistantMsgId || `asst-${Date.now()}`,
-        conversationId: targetConvId,
-        role: 'assistant',
-        content: accumulatedText,
-        status: 'complete',
-        sequence: messages.length + 2,
-        citations: capturedCitations,
-        searchGrounding: capturedGrounding,
-        createdAt: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, finalAssistantMsg]);
+      if (accumulatedText.trim().length > 0) {
+        const finalAssistantMsg: ChatMessage = {
+          id: serverAssistantMsgId || `asst-${Date.now()}`,
+          conversationId: targetConvId,
+          role: 'assistant',
+          content: accumulatedText,
+          status: 'complete',
+          sequence: messages.length + 2,
+          citations: capturedCitations,
+          searchGrounding: capturedGrounding,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, finalAssistantMsg]);
+      } else {
+        const fallbackFailMsg: ChatMessage = {
+          id: serverAssistantMsgId || `asst-${Date.now()}`,
+          conversationId: targetConvId,
+          role: 'assistant',
+          content: '⚠️ تعذر استلام الرد من الذكاء الاصطناعي، يرجى المحاولة مرة أخرى.',
+          status: 'failed',
+          sequence: messages.length + 2,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, fallbackFailMsg]);
+      }
       // Refresh conversation title if it was first message
       loadConversations();
     } catch (err: any) {

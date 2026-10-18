@@ -107,13 +107,17 @@ ${actionDirective}
 // Model Selector Helper
 // ----------------------------------------------------
 export function getModelName(type: 'fast' | 'accurate' | 'transcribe' = 'fast'): string {
+  let model = process.env.GEMINI_MODEL_FAST || 'gemini-3.5-flash-lite';
   if (type === 'transcribe') {
-    return process.env.GEMINI_MODEL_TRANSCRIBE || process.env.GEMINI_MODEL_FAST || 'gemini-3.5-flash-lite';
+    model = process.env.GEMINI_MODEL_TRANSCRIBE || process.env.GEMINI_MODEL_FAST || 'gemini-3.5-flash-lite';
+  } else if (type === 'accurate') {
+    model = process.env.GEMINI_MODEL_ACCURATE || 'gemini-3.5-flash-lite';
   }
-  if (type === 'accurate') {
-    return process.env.GEMINI_MODEL_ACCURATE || 'gemini-3.5-flash-lite';
+  // Sanitize: never allow gemini-3.8-flash due to Google free tier 20 req/day quota block
+  if (model.includes('3.8')) {
+    return 'gemini-3.5-flash-lite';
   }
-  return process.env.GEMINI_MODEL_FAST || 'gemini-3.5-flash-lite';
+  return model;
 }
 
 export function isGeminiConfigured(): boolean {
@@ -172,8 +176,11 @@ export async function streamGeminiChat(
   const candidateModels = [
     modelName,
     'gemini-3.5-flash-lite',
-    'gemini-3.8-flash',
-  ].filter((v, i, a) => a.indexOf(v) === i);
+    'gemini-3.5-flash',
+    'gemini-flash-lite-latest',
+  ]
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .filter((m) => !m.includes('3.8'));
 
   return await retryWithBackoff(async () => {
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -285,9 +292,19 @@ export async function streamGeminiChat(
         return { fullText, searchGrounding };
       } catch (err: any) {
         lastError = err;
-        const isQuotaOrNotFound = err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('404') || err?.message?.includes('RESOURCE_EXHAUSTED');
-        if (isQuotaOrNotFound && currentModelName !== candidateModels[candidateModels.length - 1]) {
-          console.warn(`[GEMINI_FALLBACK] Model ${currentModelName} failed (${err.message}). Trying fallback model...`);
+        const isFallbackEligible =
+          err?.status === 429 ||
+          err?.status === 503 ||
+          err?.status === 404 ||
+          err?.message?.includes('429') ||
+          err?.message?.includes('404') ||
+          err?.message?.includes('503') ||
+          err?.message?.includes('RESOURCE_EXHAUSTED') ||
+          err?.message?.includes('not found') ||
+          err?.message?.includes('Overloaded');
+
+        if (isFallbackEligible && currentModelName !== candidateModels[candidateModels.length - 1]) {
+          console.warn(`[GEMINI_FALLBACK] Model ${currentModelName} failed (${err.message}). Trying next candidate model...`);
           continue;
         }
         throw err;
