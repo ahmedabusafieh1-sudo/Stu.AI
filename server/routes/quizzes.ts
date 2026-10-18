@@ -9,6 +9,7 @@ import {
   conversations,
   messages,
   attachments,
+  messageAttachments,
   sourceUnits,
   createQuizSchema,
   submitQuizSchema,
@@ -18,6 +19,7 @@ import {
   gradeEssayAnswer,
   isGeminiConfigured,
 } from '../services/gemini.js';
+import { storage } from '../services/storage.js';
 import { requireAuth, requireVerified } from '../middleware/auth.js';
 
 export const quizzesRouter = Router();
@@ -62,7 +64,7 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
     if (selectedAttachmentIds && selectedAttachmentIds.length > 0) {
       targetAttachmentIds = selectedAttachmentIds;
     } else if (conversationId) {
-      // Find all attachments in this conversation
+      // Find attachments belonging specifically to messages in this conversation
       const convMessages = await db
         .select({ id: messages.id })
         .from(messages)
@@ -70,15 +72,40 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
 
       const msgIds = convMessages.map((m: any) => m.id);
       if (msgIds.length > 0) {
-        const attList = await db
-          .select({ attachmentId: attachments.id })
-          .from(attachments)
-          .where(and(eq(attachments.userId, req.user!.id), eq(attachments.status, 'ready')));
-        targetAttachmentIds = attList.map((a: any) => a.attachmentId);
+        const convAttachments = await db
+          .select({ attachmentId: messageAttachments.attachmentId })
+          .from(messageAttachments)
+          .where(inArray(messageAttachments.messageId, msgIds));
+
+        targetAttachmentIds = convAttachments.map((a: any) => a.attachmentId);
       }
     }
 
-    // Load extracted source units
+    // Check for images among target attachments
+    const imagesData: { mimeType: string; buffer: Buffer; fileName?: string }[] = [];
+    if (targetAttachmentIds.length > 0) {
+      const targetAttRecords = await db
+        .select()
+        .from(attachments)
+        .where(and(eq(attachments.userId, req.user!.id), inArray(attachments.id, targetAttachmentIds)));
+
+      for (const att of targetAttRecords) {
+        if ((att.mimeType.startsWith('image/') || att.mimeType === 'application/pdf') && imagesData.length < 5) {
+          try {
+            const buf = await storage.getFileBuffer(att.storageKey);
+            imagesData.push({
+              mimeType: att.mimeType,
+              buffer: buf,
+              fileName: att.originalName,
+            });
+          } catch (err) {
+            console.warn(`[QUIZ_ATTACHMENT_LOAD_ERR] Failed loading ${att.originalName}:`, err);
+          }
+        }
+      }
+    }
+
+    // Load extracted source units (cap at 6 to prevent exceeding Gemini token rate limits)
     let sourcesData: { fileName: string; unitIndex: number; text: string }[] = [];
 
     if (targetAttachmentIds.length > 0) {
@@ -91,24 +118,27 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
         .from(sourceUnits)
         .innerJoin(attachments, eq(sourceUnits.attachmentId, attachments.id))
         .where(inArray(sourceUnits.attachmentId, targetAttachmentIds))
-        .orderBy(asc(sourceUnits.unitIndex));
+        .orderBy(asc(sourceUnits.unitIndex))
+        .limit(6);
 
       sourcesData = unitsList;
     }
 
-    // If no attachments found and no custom topic:
-    if (sourcesData.length === 0 && !topic) {
+    // If no attachments found and no images and no custom topic:
+    if (sourcesData.length === 0 && imagesData.length === 0 && !topic) {
       return res.status(400).json({
-        error: 'لا توجد مصادر دراسية جاهزة في هذه المحادثة. يرجى رفع ملفات دراسية أولاً أو كتابة موضوع الكويز المطلوب.',
+        error: 'لا توجد مصادر دراسية أو صور محددة للكويز. يرجى رفع صور/ملفات دراسية أولاً أو كتابة موضوع الكويز المطلوب.',
       });
     }
 
-    // If no attachment sources but user provided custom topic
-    if (sourcesData.length === 0 && topic) {
+    // If no text source units but user provided images or custom topic
+    if (sourcesData.length === 0) {
       sourcesData.push({
-        fileName: 'موضوع مخصص',
+        fileName: imagesData.length > 0 ? 'الصور والمرفقات المحددة' : 'موضوع مخصص',
         unitIndex: 1,
-        text: `الموضوع الدراسي المطلوب: ${topic}`,
+        text: topic
+          ? `الموضوع الدراسي المطلوب: ${topic}`
+          : 'المطلوب إنشاء كويز تفاعلي شامل ومتقن بناءً على الصور والمرفقات المعطاة.',
       });
     }
 
@@ -119,6 +149,7 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
       difficulty,
       language,
       customTopic: topic,
+      imagesData,
     });
 
     if (!generated.questions || generated.questions.length === 0) {
@@ -551,3 +582,154 @@ quizzesRouter.post('/:id/explain-mistakes', requireAuth, requireVerified, async 
     return res.status(500).json({ error: 'فشل معالجة طلب شرح الأخطاء.' });
   }
 });
+
+// ----------------------------------------------------
+// 5. Save Quiz & Answers to Chat Conversation
+// ----------------------------------------------------
+quizzesRouter.post('/:id/save-to-chat', requireAuth, requireVerified, async (req: Request, res: Response) => {
+  try {
+    const { includeCorrections } = req.body;
+    const { db } = await getDb();
+
+    // Verify quiz ownership
+    const quizList = await db
+      .select()
+      .from(quizzes)
+      .where(and(eq(quizzes.id, req.params.id), eq(quizzes.userId, req.user!.id)))
+      .limit(1);
+
+    if (quizList.length === 0) {
+      return res.status(404).json({ error: 'الكويز غير موجود أو غير مصرح بالوصول إليه.' });
+    }
+
+    const quiz = quizList[0];
+    let targetConvId = quiz.conversationId;
+
+    // If quiz has no linked conversation, link to latest or create a new one
+    if (!targetConvId) {
+      const latestConv = await db
+        .select()
+        .from(conversations)
+        .where(eq(conversations.userId, req.user!.id))
+        .orderBy(desc(conversations.updatedAt))
+        .limit(1);
+
+      if (latestConv.length > 0) {
+        targetConvId = latestConv[0].id;
+      } else {
+        const createdConv = await db
+          .insert(conversations)
+          .values({
+            userId: req.user!.id,
+            title: quiz.title,
+          })
+          .returning();
+        targetConvId = createdConv[0].id;
+      }
+
+      await db.update(quizzes).set({ conversationId: targetConvId }).where(eq(quizzes.id, quiz.id));
+    }
+
+    // Fetch quiz questions
+    const qList = await db
+      .select()
+      .from(quizQuestions)
+      .where(eq(quizQuestions.quizId, quiz.id))
+      .orderBy(asc(quizQuestions.questionOrder));
+
+    // Fetch latest completed attempt and answers
+    const attempts = await db
+      .select()
+      .from(quizAttempts)
+      .where(and(eq(quizAttempts.quizId, quiz.id), eq(quizAttempts.userId, req.user!.id)))
+      .orderBy(desc(quizAttempts.createdAt))
+      .limit(1);
+
+    const attempt = attempts[0];
+    let answersMap = new Map<string, any>();
+    if (attempt) {
+      const answersList = await db
+        .select()
+        .from(quizAnswers)
+        .where(eq(quizAnswers.attemptId, attempt.id));
+      answersMap = new Map<string, any>(answersList.map((a: any) => [a.questionId, a]));
+    }
+
+    // Determine sequence
+    const lastMsg = await db
+      .select({ sequence: messages.sequence })
+      .from(messages)
+      .where(eq(messages.conversationId, targetConvId))
+      .orderBy(desc(messages.sequence))
+      .limit(1);
+
+    const nextSeq = (lastMsg[0]?.sequence ?? 0) + 1;
+
+    let chatContent = '';
+    if (includeCorrections && attempt && attempt.status === 'completed') {
+      const percentage = attempt.totalPoints > 0 ? Math.round((attempt.score / attempt.totalPoints) * 100) : 0;
+      chatContent = `### 📊 تقرير نتيجة وتصحيح الاختبار: **${quiz.title}**\n\n`;
+      chatContent += `🏆 **النتيجة النهائية:** ${attempt.score} من ${attempt.totalPoints} (${percentage}%)\n\n`;
+      chatContent += `---\n\n#### 📝 تفاصيل الأسئلة والتصحيح الشامل:\n\n`;
+
+      qList.forEach((q: any, idx: number) => {
+        const ans = answersMap.get(q.id);
+        const studentAns = ans?.studentAnswer?.trim() || '[لم تتم الإجابة]';
+        const isCorrect = ans?.isCorrect ?? false;
+        const icon = isCorrect ? '✅ إجابة صحيحة' : '❌ إجابة غير صحيحة';
+        const pointsAwarded = ans?.earnedPoints ?? (isCorrect ? q.points : 0);
+
+        chatContent += `**السؤال ${idx + 1}: ${q.questionText}** (${pointsAwarded}/${q.points} درجة) - ${icon}\n`;
+        chatContent += `- **إجابتك:** ${studentAns}\n`;
+        if (!isCorrect) {
+          chatContent += `- **الإجابة النموذجية الصحيحة:** ${q.correctKey}\n`;
+        }
+        chatContent += `- **التفسير والشرح:** ${q.explanation}\n`;
+        if (ans?.aiFeedback) {
+          chatContent += `- **ملاحظات المصحح:** ${ans.aiFeedback}\n`;
+        }
+        chatContent += `\n`;
+      });
+    } else {
+      chatContent = `### 📝 سجل إجابات الاختبار: **${quiz.title}**\n\n`;
+      chatContent += `**عدد الأسئلة:** ${qList.length} | **النوع:** ${quiz.type} | **الصعوبة:** ${quiz.difficulty}\n\n`;
+      chatContent += `---\n\n#### 📋 إجابات الطالب المسجلة:\n\n`;
+
+      qList.forEach((q: any, idx: number) => {
+        const ans = answersMap.get(q.id);
+        const studentAns = ans?.studentAnswer?.trim() || '[لم تتم الإجابة]';
+        chatContent += `**السؤال ${idx + 1}: ${q.questionText}**\n`;
+        chatContent += `- **إجابتك المسجلة:** ${studentAns}\n\n`;
+      });
+
+      chatContent += `> 💡 *ملاحظة: يمكنك في أي وقت طلب تصحيح هذا الاختبار أو سؤالي عن أي سؤال لمزيد من التوضيح والشرح.*`;
+    }
+
+    const insertedMsg = await db
+      .insert(messages)
+      .values({
+        conversationId: targetConvId,
+        role: 'assistant',
+        content: chatContent,
+        status: 'complete',
+        sequence: nextSeq,
+      })
+      .returning();
+
+    // Update conversation updatedAt
+    await db
+      .update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, targetConvId));
+
+    return res.status(201).json({
+      success: true,
+      message: insertedMsg[0],
+      conversationId: targetConvId,
+    });
+  } catch (err: any) {
+    console.error('[SAVE_QUIZ_TO_CHAT_ERR]', err);
+    return res.status(500).json({ error: 'فشل حفظ الكويز في المحادثة.' });
+  }
+});
+

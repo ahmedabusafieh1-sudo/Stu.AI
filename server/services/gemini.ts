@@ -425,6 +425,7 @@ export async function generateQuizWithGemini(
     difficulty: 'easy' | 'medium' | 'hard';
     language: 'ar' | 'en';
     customTopic?: string;
+    imagesData?: { mimeType: string; buffer: Buffer; fileName?: string }[];
   }
 ): Promise<z.infer<typeof generatedQuizSchema>> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -433,12 +434,20 @@ export async function generateQuizWithGemini(
   }
 
   const modelName = getModelName('accurate');
+  const candidateModels = [
+    modelName,
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-flash-lite-latest',
+  ]
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .filter((m) => !m.includes('3.8'));
 
   return await retryWithBackoff(async () => {
     const genAI = new GoogleGenerativeAI(apiKey);
 
     const prompt = `
-أنشئ كويزاً دراسياً تفاعلياً ومحكماً بناءً على المصادر الدراسية المحددة فقط.
+أنشئ كويزاً دراسياً تفاعلياً ومحكماً بناءً على المصادر والمرفقات المعطاة بدقة.
 
 إعدادات الكويز:
 - النوع: ${options.type} (mcq = اختيار من متعدد، essay = مقالي، mixed = مختلط بنسبة متقاربة)
@@ -455,33 +464,64 @@ ${options.customTopic ? `- مواصفات وشكل الكويز المطلوبة
 2. للأسئلة المقالية (essay):
    - "correctKey" يحتوي على الإجابة النموذجية ومعايير التصحيح (Rubric) والنقاط المفتاحية المطلوبة لاحتساب الدرجة.
 3. التفسير (explanation):
-   - لكل سؤال، اشرح بوضوح سبب صحة الإجابة النموذجية وسبب خطأ المشتتات، مع الاستشهاد المباشر بالمصدر.
+   - لكل سؤال، اشرح بوضوح سبب صحة الإجابة النموذجية وسبب خطأ المشتتات، مع الاستشهاد المباشر بالمصدر أو الصورة المرفقة.
 4. مراجع المصدر (sourceReferences):
-   - اذكر اسم المصدر ورقم الوحدة/الصفحة بدقة من المصادر المعطاة أدناه.
-5. الإخراج: أخرج النتيجة بصيغة JSON متوافقة بدقة مع المخطط المطلوب فقط دون نصوص إضافية.
+   - اذكر اسم المصدر أو الصورة بدقة من المواد المعطاة أدناه.
+5. الإخراج: أخرج النتيجة بصيغة JSON متوافقة بدقة مع المخطط المطلوب فقط دون أي مقدمات أو نصوص إضافية خارج JSON.
 
 المصادر الدراسية المعطاة:
 ${sourcesData
+  .slice(0, 6)
   .map(
     (s) =>
-      `[المصدر: ${s.fileName} | الوحدة/الصفحة: ${s.unitIndex}]\n${s.text.slice(0, 1500)}\n[نهاية المصدر]`
+      `[المصدر: ${s.fileName} | الوحدة/الصفحة: ${s.unitIndex}]\n${s.text.slice(0, 800)}\n[نهاية المصدر]`
   )
   .join('\n\n')}
 `.trim();
 
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.3,
-      },
-    });
+    const parts: any[] = [];
 
-    const result = await model.generateContent(prompt);
-    const jsonText = result.response.text();
-    const parsed = JSON.parse(jsonText);
+    // Attach any multi-modal image buffers
+    if (options.imagesData && options.imagesData.length > 0) {
+      for (const img of options.imagesData) {
+        if (img.buffer && (img.mimeType.startsWith('image/') || img.mimeType === 'application/pdf')) {
+          parts.push({
+            inlineData: {
+              mimeType: img.mimeType,
+              data: img.buffer.toString('base64'),
+            },
+          });
+        }
+      }
+    }
 
-    return generatedQuizSchema.parse(parsed);
+    parts.push({ text: prompt });
+
+    let lastError: any = null;
+    for (const currentModelName of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: currentModelName,
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.3,
+          },
+        });
+
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts }],
+        });
+
+        const jsonText = result.response.text();
+        const parsed = JSON.parse(jsonText);
+        return generatedQuizSchema.parse(parsed);
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[QUIZ_MODEL_FALLBACK] Model ${currentModelName} failed: ${err.message}. Trying next fallback model...`);
+      }
+    }
+
+    throw lastError || new Error('فشل توليد الكويز عبر جميع نماذج الذكاء الاصطناعي المتاحة.');
   });
 }
 

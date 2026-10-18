@@ -65,6 +65,7 @@ interface ChatContextType {
   sendMessage: (content: string, actionType?: string) => Promise<void>;
   stopStreaming: () => void;
   retryLastMessage: () => Promise<void>;
+  refreshConversation: (id?: string) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -125,6 +126,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err) {
       console.error('Failed to load conversation messages:', err);
+    }
+  };
+
+  const refreshConversation = async (id?: string) => {
+    const targetId = id || activeConversationId;
+    if (targetId) {
+      await selectConversation(targetId);
+      await loadConversations();
     }
   };
 
@@ -574,6 +583,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendMessage,
         stopStreaming,
         retryLastMessage,
+        refreshConversation,
       }}
     >
       {children}
