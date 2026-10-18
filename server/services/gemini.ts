@@ -393,15 +393,15 @@ export interface GeneratedQuestion {
 }
 
 export const generatedQuizSchema = z.object({
-  title: z.string(),
+  title: z.string().default('كويز دراسي تفاعلي'),
   questions: z.array(
     z.object({
-      questionOrder: z.number(),
-      questionType: z.enum(['mcq', 'essay']),
-      questionText: z.string().min(5),
-      options: z.array(z.string()).length(4).optional(),
-      correctKey: z.string().min(1),
-      explanation: z.string().min(5),
+      questionOrder: z.number().default(1),
+      questionType: z.enum(['mcq', 'essay']).default('mcq'),
+      questionText: z.string(),
+      options: z.array(z.string()).optional(),
+      correctKey: z.string().default(''),
+      explanation: z.string().default(''),
       points: z.number().default(1),
       topic: z.string().default('عام'),
       sourceReferences: z
@@ -514,7 +514,39 @@ ${sourcesData
 
         const jsonText = result.response.text();
         const parsed = JSON.parse(jsonText);
-        return generatedQuizSchema.parse(parsed);
+
+        let normalized: any = parsed;
+        if (Array.isArray(parsed)) {
+          normalized = {
+            title: options.customTopic ? `كويز: ${options.customTopic}` : 'كويز دراسي تفاعلي',
+            questions: parsed,
+          };
+        } else if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.questions)) {
+            normalized = {
+              title: parsed.title || (options.customTopic ? `كويز: ${options.customTopic}` : 'كويز دراسي تفاعلي'),
+              questions: parsed.questions,
+            };
+          } else if (Array.isArray(parsed.quiz)) {
+            normalized = {
+              title: parsed.title || 'كويز دراسي تفاعلي',
+              questions: parsed.quiz,
+            };
+          } else if (parsed.quiz && Array.isArray(parsed.quiz.questions)) {
+            normalized = parsed.quiz;
+          }
+        }
+
+        if (Array.isArray(normalized?.questions)) {
+          normalized.questions = normalized.questions.map((q: any, i: number) => ({
+            ...q,
+            questionOrder: q.questionOrder || i + 1,
+            points: q.points || 1,
+            topic: q.topic || 'عام',
+          }));
+        }
+
+        return generatedQuizSchema.parse(normalized);
       } catch (err: any) {
         lastError = err;
         console.warn(`[QUIZ_MODEL_FALLBACK] Model ${currentModelName} failed: ${err.message}. Trying next fallback model...`);
