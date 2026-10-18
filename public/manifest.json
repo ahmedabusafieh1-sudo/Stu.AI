@@ -1,0 +1,20 @@
+{
+  "short_name": "Stu.Ai",
+  "name": "Stu.Ai - مساعد الدراسة الذكي",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#171717",
+  "theme_color": "#171717",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "description": "مساعد دراسي ذكي يشرح الملفات والصور ويحل المسائل خطوة بخطوة وينشئ اختبارات تفاعلية.",
+  "lang": "ar",
+  "dir": "rtl"
+}
