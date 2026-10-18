@@ -404,15 +404,7 @@ export const generatedQuizSchema = z.object({
       explanation: z.string().default(''),
       points: z.number().default(1),
       topic: z.string().default('عام'),
-      sourceReferences: z
-        .array(
-          z.object({
-            sourceName: z.string(),
-            unitIndex: z.number(),
-            quote: z.string().optional(),
-          })
-        )
-        .default([]),
+      sourceReferences: z.any().default([]),
     })
   ),
 });
@@ -538,12 +530,31 @@ ${sourcesData
         }
 
         if (Array.isArray(normalized?.questions)) {
-          normalized.questions = normalized.questions.map((q: any, i: number) => ({
-            ...q,
-            questionOrder: q.questionOrder || i + 1,
-            points: q.points || 1,
-            topic: q.topic || 'عام',
-          }));
+          normalized.questions = normalized.questions.map((q: any, i: number) => {
+            const questionText = q.questionText || q.question || q.text || q.prompt || `السؤال ${i + 1}`;
+            const correctKey = q.correctKey || q.correct_answer || q.correctAnswer || q.answer || '';
+            const explanation = q.explanation || q.reason || q.rationale || 'تفسير الإجابة النموذجية';
+            const rawOptions = Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : undefined;
+            
+            let sourceReferences: any[] = [];
+            if (Array.isArray(q.sourceReferences)) {
+              sourceReferences = q.sourceReferences;
+            } else if (typeof q.sourceReferences === 'string' && q.sourceReferences.trim()) {
+              sourceReferences = [{ sourceName: q.sourceReferences, unitIndex: 1 }];
+            }
+
+            return {
+              questionOrder: q.questionOrder || i + 1,
+              questionType: q.questionType === 'essay' ? 'essay' : 'mcq',
+              questionText: String(questionText),
+              options: rawOptions?.map((opt: any) => String(opt)),
+              correctKey: String(correctKey),
+              explanation: String(explanation),
+              points: Number(q.points) || 1,
+              topic: String(q.topic || 'عام'),
+              sourceReferences,
+            };
+          });
         }
 
         return generatedQuizSchema.parse(normalized);
