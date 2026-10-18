@@ -1,6 +1,5 @@
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
-import { drizzle as drizzlePglite } from 'drizzle-orm/pglite';
-import { PGlite } from '@electric-sql/pglite';
+
 import pg from 'pg';
 import path from 'path';
 import fs from 'fs';
@@ -30,6 +29,8 @@ export async function getDb() {
     console.log('[DB] PostgreSQL connected successfully.');
   } else {
     // Embedded PGlite fallback
+    const { drizzle: drizzlePglite } = await import('drizzle-orm/pglite');
+    const { PGlite } = await import('@electric-sql/pglite');
     const pgliteDir = path.resolve(process.cwd(), 'data/pglite');
     if (!fs.existsSync(pgliteDir)) {
       fs.mkdirSync(pgliteDir, { recursive: true });
