@@ -46,6 +46,7 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
     const { db } = await getDb();
 
     // Verify conversation if provided
+    let currentConv: any = null;
     if (conversationId) {
       const convList = await db
         .select()
@@ -56,6 +57,7 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
       if (convList.length === 0) {
         return res.status(404).json({ error: 'المحادثة المحددة غير موجودة.' });
       }
+      currentConv = convList[0];
     }
 
     // Collect source material from user attachments
@@ -124,20 +126,50 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
       sourcesData = unitsList;
     }
 
-    // If no attachments found and no images and no custom topic:
-    if (sourcesData.length === 0 && imagesData.length === 0 && !topic) {
-      return res.status(400).json({
-        error: 'لا توجد مصادر دراسية أو صور محددة للكويز. يرجى رفع صور/ملفات دراسية أولاً أو كتابة موضوع الكويز المطلوب.',
-      });
+    let effectiveTopic = topic?.trim();
+
+    // If no attachment sources, pull context from conversation messages
+    if (sourcesData.length === 0 && imagesData.length === 0 && conversationId) {
+      const convMsgs = await db
+        .select({ role: messages.role, content: messages.content })
+        .from(messages)
+        .where(eq(messages.conversationId, conversationId))
+        .orderBy(desc(messages.sequence))
+        .limit(10);
+
+      if (convMsgs.length > 0) {
+        const conversationText = convMsgs
+          .reverse()
+          .map((m: any) => `${m.role === 'assistant' ? 'Stu.Ai' : 'الطالب'}: ${m.content}`)
+          .join('\n\n');
+
+        if (conversationText.trim().length > 30) {
+          sourcesData.push({
+            fileName: 'سجل المحادثة الدراسية الحالية',
+            unitIndex: 1,
+            text: conversationText.slice(0, 3000),
+          });
+        }
+      }
+
+      // If still no topic, check conversation title
+      if (!effectiveTopic && currentConv?.title && currentConv.title !== 'محادثة جديدة') {
+        effectiveTopic = currentConv.title;
+      }
     }
 
-    // If no text source units but user provided images or custom topic
+    // Smart default topic if student left it blank and no files
+    if (!effectiveTopic && sourcesData.length === 0 && imagesData.length === 0) {
+      effectiveTopic = 'مفاهيم دراسية ومعلومات علمية عامة وتطبيقات تفاعلية';
+    }
+
+    // If no text source units, provide context block
     if (sourcesData.length === 0) {
       sourcesData.push({
         fileName: imagesData.length > 0 ? 'الصور والمرفقات المحددة' : 'موضوع مخصص',
         unitIndex: 1,
-        text: topic
-          ? `الموضوع الدراسي المطلوب: ${topic}`
+        text: effectiveTopic
+          ? `الموضوع الدراسي المطلوب: ${effectiveTopic}`
           : 'المطلوب إنشاء كويز تفاعلي شامل ومتقن بناءً على الصور والمرفقات المعطاة.',
       });
     }
@@ -148,7 +180,7 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
       questionCount,
       difficulty,
       language,
-      customTopic: topic,
+      customTopic: effectiveTopic,
       imagesData,
     });
 
