@@ -8,6 +8,7 @@ import {
   Camera,
   FileUp,
   Globe,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
@@ -56,9 +57,16 @@ export const ChatInput: React.FC = () => {
     }
   }, [text]);
 
+  const isAnyAttachmentUploading = pendingAttachments.some((a) => a.uploadStatus === 'uploading');
+
   const handleSend = () => {
     if (isStreaming) {
       stopStreaming();
+      return;
+    }
+
+    if (isAnyAttachmentUploading) {
+      // Prevent premature submit while attachments are still uploading
       return;
     }
 
@@ -85,7 +93,9 @@ export const ChatInput: React.FC = () => {
       // On desktop physical keyboards, Enter sends, Shift+Enter creates a new line
       if (!e.shiftKey) {
         e.preventDefault();
-        handleSend();
+        if (!isAnyAttachmentUploading) {
+          handleSend();
+        }
       }
     }
   };
@@ -248,17 +258,21 @@ export const ChatInput: React.FC = () => {
           {/* Send or Stop Button */}
           <button
             onClick={handleSend}
-            disabled={!isStreaming && !text.trim() && pendingAttachments.length === 0}
+            disabled={!isStreaming && (isAnyAttachmentUploading || (!text.trim() && pendingAttachments.length === 0))}
             className={`p-2 rounded-xl transition-all shrink-0 ${
               isStreaming
                 ? 'bg-red-500 hover:bg-red-600 text-white'
+                : isAnyAttachmentUploading
+                ? 'bg-[#3A3A3A] text-amber-400 cursor-not-allowed opacity-80'
                 : 'bg-white hover:bg-[#e5e5e5] text-black disabled:opacity-30 disabled:hover:bg-white'
             }`}
-            title={isStreaming ? t.stop : t.send}
-            aria-label={isStreaming ? t.stop : t.send}
+            title={isStreaming ? t.stop : isAnyAttachmentUploading ? 'جاري رفع المرفقات... يرجى الانتظار' : t.send}
+            aria-label={isStreaming ? t.stop : isAnyAttachmentUploading ? 'جاري رفع المرفقات...' : t.send}
           >
             {isStreaming ? (
               <Square className="w-4 h-4 fill-current text-white" />
+            ) : isAnyAttachmentUploading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
             ) : (
               <Send className="w-4 h-4 fill-current text-black" />
             )}

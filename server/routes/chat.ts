@@ -331,13 +331,13 @@ chatRouter.post(
           .where(and(inArray(attachments.id, attachmentIds), eq(attachments.userId, req.user!.id)));
 
         for (const att of userAtts) {
-          // Read buffer for images
+          // Read buffer for images or PDFs up to 15MB
           let buffer: Buffer | undefined = undefined;
-          if (att.mimeType.startsWith('image/')) {
+          if (att.mimeType.startsWith('image/') || (att.mimeType === 'application/pdf' && att.sizeBytes <= 15 * 1024 * 1024)) {
             try {
               buffer = await storage.getFileBuffer(att.storageKey);
             } catch (e) {
-              console.warn(`Could not read buffer for image ${att.id}:`, e);
+              console.warn(`Could not read buffer for attachment ${att.id}:`, e);
             }
           }
 

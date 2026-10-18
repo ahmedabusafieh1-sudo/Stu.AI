@@ -197,7 +197,7 @@ export async function streamGeminiChat(
 
     const currentParts: any[] = [];
     for (const att of attachmentsData) {
-      if (att.buffer && att.mimeType.startsWith('image/')) {
+      if (att.buffer && (att.mimeType.startsWith('image/') || att.mimeType === 'application/pdf')) {
         currentParts.push({
           inlineData: {
             mimeType: att.mimeType,

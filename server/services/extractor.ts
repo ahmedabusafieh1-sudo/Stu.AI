@@ -202,43 +202,62 @@ export async function extractSourceUnits(
 
       case 'pdf': {
         hasVisuals = true;
-        const pdfData = await pdfParse(buffer);
-        const totalPages = pdfData.numpages || 1;
-        const fullText = pdfData.text || '';
+        try {
+          // Limit to 60 pages to prevent memory spikes on massive textbooks
+          const parsePromise = pdfParse(buffer, { max: 60 });
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('PDF extraction timed out')), 10000)
+          );
 
-        // Check if PDF text is extracted or scanned
-        if (fullText.trim().length < 50) {
-          warnings.push('المستند يبدو أنه PDF ممسوح ضوئياً أو ذو نصوص قليلة؛ ستتم قراءته عبر الرؤية البصرية للنموذج.');
-        }
+          const pdfData = (await Promise.race([parsePromise, timeoutPromise])) as any;
+          const totalPages = Math.min(pdfData.numpages || 1, 60);
+          const fullText = pdfData.text || '';
 
-        // Split text roughly by form feeds (\f) or chunks of pages
-        const pages = fullText.split('\f');
-        if (pages.length >= totalPages && pages.length > 1) {
-          for (let i = 0; i < totalPages; i++) {
-            const pageContent = (pages[i] || '').trim();
-            units.push({
-              unitIndex: i + 1,
-              unitType: 'page',
-              contentText: pageContent || `[الصفحة ${i + 1}: محتوى بصري/رسوم]`,
-              facts: extractKeyFacts(pageContent),
-              formulas: extractFormulas(pageContent),
-              status: pageContent ? 'ready' : 'unclear',
-            });
+          // Check if PDF text is extracted or scanned
+          if (fullText.trim().length < 50) {
+            warnings.push('المستند يتضمن صوراً أو نصوصاً قليلة؛ ستتم قراءته وفهمه عبر الرؤية البصرية للنموذج.');
           }
-        } else {
-          // If form feeds are absent, chunk evenly across total pages
-          const chunkSize = Math.max(1, Math.ceil(fullText.length / totalPages));
-          for (let i = 0; i < totalPages; i++) {
-            const chunk = fullText.slice(i * chunkSize, (i + 1) * chunkSize).trim();
-            units.push({
-              unitIndex: i + 1,
-              unitType: 'page',
-              contentText: chunk || `[الصفحة ${i + 1}: محتوى بصري]`,
-              facts: extractKeyFacts(chunk),
-              formulas: extractFormulas(chunk),
-              status: chunk ? 'ready' : 'unclear',
-            });
+
+          // Split text roughly by form feeds (\f) or chunks of pages
+          const pages = fullText.split('\f');
+          if (pages.length >= totalPages && pages.length > 1) {
+            for (let i = 0; i < totalPages; i++) {
+              const pageContent = (pages[i] || '').trim();
+              units.push({
+                unitIndex: i + 1,
+                unitType: 'page',
+                contentText: pageContent || `[الصفحة ${i + 1}: محتوى بصري/رسوم]`,
+                facts: extractKeyFacts(pageContent),
+                formulas: extractFormulas(pageContent),
+                status: pageContent ? 'ready' : 'unclear',
+              });
+            }
+          } else {
+            // If form feeds are absent, chunk evenly across total pages
+            const chunkSize = Math.max(1, Math.ceil(fullText.length / totalPages));
+            for (let i = 0; i < totalPages; i++) {
+              const chunk = fullText.slice(i * chunkSize, (i + 1) * chunkSize).trim();
+              units.push({
+                unitIndex: i + 1,
+                unitType: 'page',
+                contentText: chunk || `[الصفحة ${i + 1}: محتوى بصري]`,
+                facts: extractKeyFacts(chunk),
+                formulas: extractFormulas(chunk),
+                status: chunk ? 'ready' : 'unclear',
+              });
+            }
           }
+        } catch (pdfErr: any) {
+          console.warn(`[PDF_SAFE_FALLBACK] pdfParse error or timeout for ${originalName}:`, pdfErr.message);
+          warnings.push(`تم اعتماد المستند للمعالجة المباشرة بالذكاء الاصطناعي: ${pdfErr.message}`);
+          units.push({
+            unitIndex: 1,
+            unitType: 'page',
+            contentText: `[مستند PDF: ${originalName}]. سيتم استخراج وشرح المعلومات منه مباشرة عبر نموذج الذكاء الاصطناعي.`,
+            facts: [`مستند دراسي: ${originalName}`],
+            formulas: [],
+            status: 'ready',
+          });
         }
         break;
       }

@@ -18,8 +18,8 @@ export async function enqueueAttachmentJob(attachmentId: string): Promise<string
     })
     .returning({ id: processingJobs.id });
 
-  // Trigger processing asynchronously
-  triggerWorker();
+  // Trigger processing asynchronously without blocking caller
+  setImmediate(() => triggerWorker());
   return inserted[0].id;
 }
 
@@ -29,8 +29,16 @@ export function startBackgroundWorker() {
   stopRequested = false;
   console.log('[JOB_WORKER] Background document processing worker started.');
 
-  // Run initial check for recovered jobs
-  triggerWorker();
+  // Clean up any stale processing jobs from prior crash/restart
+  getDb().then(async ({ db }) => {
+    try {
+      await db
+        .update(processingJobs)
+        .set({ status: 'failed', errorMessage: 'فشل المعالجة بسبب إعادة تشغيل غير متوقعة' })
+        .where(eq(processingJobs.status, 'processing'));
+    } catch {}
+    triggerWorker();
+  }).catch(() => {});
 }
 
 export function stopBackgroundWorker() {
@@ -45,16 +53,18 @@ async function triggerWorker() {
   try {
     const { db } = await getDb();
 
-    // Recover or fetch pending jobs (limit concurrency to 2 at a time)
+    // Fetch only pending jobs (limit concurrency to 1 to preserve low memory usage)
     const jobs = await db
       .select()
       .from(processingJobs)
-      .where(or(eq(processingJobs.status, 'pending'), eq(processingJobs.status, 'processing')))
-      .limit(3);
+      .where(eq(processingJobs.status, 'pending'))
+      .limit(1);
 
     for (const job of jobs) {
       if (stopRequested) break;
       await processSingleJob(job);
+      // Yield to event loop between jobs
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
   } catch (err: any) {
     console.error('[JOB_WORKER] Loop error:', err.message);

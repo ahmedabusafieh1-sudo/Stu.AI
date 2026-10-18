@@ -11,11 +11,11 @@ import { requireAuth, requireVerified } from '../middleware/auth.js';
 
 export const attachmentsRouter = Router();
 
-// Configure Multer memory storage with 25MB single file limit
+// Configure Multer memory storage with 50MB single file limit
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 25 * 1024 * 1024, // 25 MB max per file
+    fileSize: 50 * 1024 * 1024, // 50 MB max per file
     files: 20, // 20 files max per request
   },
 });
@@ -27,7 +27,24 @@ attachmentsRouter.post(
   '/upload',
   requireAuth,
   requireVerified,
-  upload.array('files', 20),
+  (req: Request, res: Response, next: any) => {
+    upload.array('files', 20)(req, res, (err: any) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            error: 'حجم الملف يتجاوز الحد الأقصى المسموح به (50 ميجابايت للمستندات / 20 ميجابايت للصور).',
+          });
+        }
+        if (err.code === 'LIMIT_FILE_COUNT') {
+          return res.status(400).json({
+            error: 'تم تجاوز الحد الأقصى لعدد الملفات المسموح برفعها دفعة واحدة (20 ملفاً).',
+          });
+        }
+        return res.status(400).json({ error: err.message || 'خطأ أثناء رفع الملفات.' });
+      }
+      next();
+    });
+  },
   async (req: Request, res: Response) => {
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) {
@@ -53,9 +70,9 @@ attachmentsRouter.post(
           continue;
         }
 
-        // Additional image size check (10 MB limit for images)
-        if (validation.detectedType === 'image' && file.size > 10 * 1024 * 1024) {
-          errors.push(`${file.originalname}: حجم الصورة يتجاوز الحد الأقصى للصور (10 ميجابايت).`);
+        // Additional image size check (20 MB limit for images)
+        if (validation.detectedType === 'image' && file.size > 20 * 1024 * 1024) {
+          errors.push(`${file.originalname}: حجم الصورة يتجاوز الحد الأقصى للصور (20 ميجابايت).`);
           continue;
         }
 

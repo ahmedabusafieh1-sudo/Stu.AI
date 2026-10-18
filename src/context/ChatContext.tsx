@@ -188,8 +188,31 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fileList = Array.from(files);
     if (fileList.length === 0) return;
 
-    // Create preliminary UI items
-    const newItems: AttachmentItem[] = fileList.map((f) => ({
+    const MAX_DOC_SIZE = 50 * 1024 * 1024; // 50 MB
+    const MAX_IMG_SIZE = 20 * 1024 * 1024; // 20 MB
+
+    const oversizedItems: AttachmentItem[] = [];
+    const validFiles: File[] = [];
+
+    fileList.forEach((f) => {
+      const isImg = f.type.startsWith('image/');
+      const limit = isImg ? MAX_IMG_SIZE : MAX_DOC_SIZE;
+      if (f.size > limit) {
+        oversizedItems.push({
+          file: f,
+          originalName: f.name,
+          mimeType: f.type || 'application/octet-stream',
+          sizeBytes: f.size,
+          uploadStatus: 'failed',
+          error: `حجم الملف (${(f.size / (1024 * 1024)).toFixed(1)} MB) يتجاوز الحد الأقصى (${isImg ? 20 : 50} MB)`,
+        });
+      } else {
+        validFiles.push(f);
+      }
+    });
+
+    // Create preliminary UI items for valid files
+    const validUiItems: AttachmentItem[] = validFiles.map((f) => ({
       file: f,
       originalName: f.name,
       mimeType: f.type || 'application/octet-stream',
@@ -198,11 +221,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       uploadStatus: 'uploading',
     }));
 
-    setPendingAttachments((prev) => [...prev, ...newItems]);
+    setPendingAttachments((prev) => [...prev, ...oversizedItems, ...validUiItems]);
 
-    // Send formData
+    if (validFiles.length === 0) return;
+
+    // Send formData for valid files
     const formData = new FormData();
-    fileList.forEach((f) => formData.append('files', f));
+    validFiles.forEach((f) => formData.append('files', f));
 
     try {
       const res = await fetch('/api/attachments/upload', {
@@ -227,22 +252,32 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           })
         );
       } else {
-        // Mark all as failed
+        // Mark these validFiles as failed with server error
         setPendingAttachments((prev) =>
-          prev.map((item) => ({
-            ...item,
-            uploadStatus: 'failed',
-            error: data.error || 'فشل رفع الملف',
-          }))
+          prev.map((item) => {
+            if (validFiles.some((vf) => vf.name === item.originalName && item.uploadStatus === 'uploading')) {
+              return {
+                ...item,
+                uploadStatus: 'failed',
+                error: data.error || 'فشل رفع الملف',
+              };
+            }
+            return item;
+          })
         );
       }
     } catch (err: any) {
       setPendingAttachments((prev) =>
-        prev.map((item) => ({
-          ...item,
-          uploadStatus: 'failed',
-          error: err.message,
-        }))
+        prev.map((item) => {
+          if (validFiles.some((vf) => vf.name === item.originalName && item.uploadStatus === 'uploading')) {
+            return {
+              ...item,
+              uploadStatus: 'failed',
+              error: err.message || 'فشل الاتصال بالخادم أثناء الرفع',
+            };
+          }
+          return item;
+        })
       );
     }
   };

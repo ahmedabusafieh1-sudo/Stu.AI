@@ -33,9 +33,9 @@ export const AttachmentTray: React.FC = () => {
                 </div>
               )}
               {isFailed && (
-                <div className="absolute inset-0 bg-red-950/80 flex flex-col items-center justify-center text-red-300 text-[10px]">
-                  <AlertCircle className="w-4 h-4 mb-1" />
-                  <span>فشل</span>
+                <div className="absolute inset-0 bg-red-950/90 p-1 flex flex-col items-center justify-center text-red-300 text-[10px] text-center" title={att.error || 'فشل الرفع'}>
+                  <AlertCircle className="w-4 h-4 mb-0.5 text-red-400 shrink-0" />
+                  <span className="truncate w-full px-1">{att.error || 'فشل'}</span>
                 </div>
               )}
               {/* Remove button */}
@@ -71,9 +71,9 @@ export const AttachmentTray: React.FC = () => {
                   </span>
                 )}
                 {isFailed && (
-                  <span className="flex items-center text-red-400">
-                    <AlertCircle className="w-2.5 h-2.5 mr-0.5" />
-                    فشل
+                  <span className="flex items-center text-red-400 font-medium" title={att.error || 'فشل الرفع'}>
+                    <AlertCircle className="w-2.5 h-2.5 mr-0.5 shrink-0" />
+                    <span className="truncate max-w-[120px]">{att.error || 'فشل الرفع'}</span>
                   </span>
                 )}
                 {att.uploadStatus === 'ready' && (
