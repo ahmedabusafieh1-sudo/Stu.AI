@@ -176,25 +176,31 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
     const quiz = insertedQuiz[0];
 
     // Insert Quiz Questions into DB
+    const insertedQuestions: any[] = [];
     for (let i = 0; i < generated.questions.length; i++) {
       const q = generated.questions[i];
-      await db.insert(quizQuestions).values({
-        quizId: quiz.id,
-        questionOrder: i + 1,
-        questionType: q.questionType,
-        questionText: q.questionText,
-        options: q.options || [],
-        correctKey: q.correctKey,
-        explanation: q.explanation,
-        points: q.points || 1,
-        topic: q.topic || 'عام',
-        sourceReferences: q.sourceReferences || [],
-      });
+      const inserted = await db
+        .insert(quizQuestions)
+        .values({
+          quizId: quiz.id,
+          questionOrder: i + 1,
+          questionType: q.questionType,
+          questionText: q.questionText,
+          options: q.options || [],
+          correctKey: q.correctKey,
+          explanation: q.explanation,
+          points: q.points || 1,
+          topic: q.topic || 'عام',
+          sourceReferences: q.sourceReferences || [],
+        })
+        .returning();
+      insertedQuestions.push(inserted[0]);
     }
 
-    // Fetch sanitized questions for client (STRIP correctKey and explanation)
-    const clientQuestions = generated.questions.map((q, idx) => ({
-      questionOrder: idx + 1,
+    // Fetch sanitized questions for client (STRIP correctKey and explanation, but include id)
+    const clientQuestions = insertedQuestions.map((q) => ({
+      id: q.id,
+      questionOrder: q.questionOrder,
       questionType: q.questionType,
       questionText: q.questionText,
       options: q.options || [],
