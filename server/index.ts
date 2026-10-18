@@ -147,22 +147,24 @@ async function bootstrap() {
       console.log(`======================================================\n`);
     });
 
-    // 4. Fallback redirect server on port 5173 to catch any legacy email links
-    try {
-      const redirectApp = express();
-      redirectApp.use((req, res) => {
-        const host = (req.get('host') || 'localhost').replace(':5173', `:${PORT}`);
-        const target = `${req.protocol}://${host}${req.url.replace('/reset-password', '/')}`;
-        res.redirect(302, target);
-      });
-      const redirectServer = redirectApp.listen(5173, '0.0.0.0', () => {
-        console.log(`[Redirect] Port 5173 redirecting to port ${PORT}`);
-      });
-      redirectServer.on('error', () => {
-        // Port 5173 in use or unavailable, ignore
-      });
-    } catch {
-      // Ignore
+    // 4. Fallback redirect server on port 5173 for local dev only
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        const redirectApp = express();
+        redirectApp.use((req, res) => {
+          const host = (req.get('host') || 'localhost').replace(':5173', `:${PORT}`);
+          const target = `${req.protocol}://${host}${req.url.replace('/reset-password', '/')}`;
+          res.redirect(302, target);
+        });
+        const redirectServer = redirectApp.listen(5173, '0.0.0.0', () => {
+          console.log(`[Redirect] Port 5173 redirecting to port ${PORT}`);
+        });
+        redirectServer.on('error', () => {
+          // Port 5173 in use or unavailable, ignore
+        });
+      } catch {
+        // Ignore
+      }
     }
   } catch (err: any) {
     console.error('[BOOTSTRAP_FAIL]', err);
