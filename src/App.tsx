@@ -1,12 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  BookOpen,
-  FileText,
-  Calculator,
-  HelpCircle,
   ArrowDown,
   Loader2,
-  Sparkles,
 } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import { useChat } from './context/ChatContext';
@@ -105,9 +100,9 @@ export const App: React.FC = () => {
           className="flex-1 overflow-y-auto relative scroll-smooth"
         >
           {messages.length === 0 ? (
-            /* Empty State / Welcome Screen */
-            <div className="max-w-2xl mx-auto px-4 py-8 sm:py-16 text-center select-none">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#232323] border border-[#3A3A3A] flex items-center justify-center p-2.5 mb-4 shadow-lg">
+            /* Empty State / Clean ChatGPT-Style Welcome Screen */
+            <div className="max-w-xl mx-auto px-4 py-16 sm:py-28 text-center select-none flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#232323] border border-[#3A3A3A] flex items-center justify-center p-3 mb-5 shadow-lg">
                 <svg viewBox="0 0 512 512" className="w-full h-full text-white fill-current">
                   <path d="M256 120 L390 195 L256 270 L122 195 Z" fill="#F5F5F5" />
                   <path d="M256 280 C290 260 350 250 400 258 L400 375 C350 367 290 377 256 400 Z" fill="#3B82F6" />
@@ -115,77 +110,12 @@ export const App: React.FC = () => {
                 </svg>
               </div>
 
-              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
                 {t.welcomeTitle}
               </h2>
-              <p className="text-xs sm:text-sm text-[#B5B5B5] max-w-md mx-auto mb-8 leading-relaxed">
+              <p className="text-sm sm:text-base text-[#B5B5B5] max-w-md mx-auto leading-relaxed">
                 {t.welcomeSubtitle}
               </p>
-
-              {/* Quick Starter Action Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
-                {/* 1. Explain Lesson */}
-                <button
-                  onClick={() =>
-                    sendMessage('اشرح لي درساً في الرياضيات أو الفيزياء مع القوانين وأمثلة محلولة وسؤال فهم قصير.')
-                  }
-                  className="p-4 rounded-2xl bg-[#232323] hover:bg-[#2B2B2B] border border-[#3A3A3A] transition-all text-right group"
-                >
-                  <div className="flex items-center gap-2 font-semibold text-sm text-white mb-1">
-                    <BookOpen className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
-                    <span>{t.welcomeCard1Title}</span>
-                  </div>
-                  <p className="text-xs text-[#888888] leading-relaxed">
-                    {t.welcomeCard1Desc}
-                  </p>
-                </button>
-
-                {/* 2. Summarize Files */}
-                <button
-                  onClick={() =>
-                    sendMessage('كيف ألخص محاضراتي وملفاتي الدراسية بشكل منظم يستخرج أهم المصطلحات والقوانين؟')
-                  }
-                  className="p-4 rounded-2xl bg-[#232323] hover:bg-[#2B2B2B] border border-[#3A3A3A] transition-all text-right group"
-                >
-                  <div className="flex items-center gap-2 font-semibold text-sm text-white mb-1">
-                    <FileText className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-                    <span>{t.welcomeCard2Title}</span>
-                  </div>
-                  <p className="text-xs text-[#888888] leading-relaxed">
-                    {t.welcomeCard2Desc}
-                  </p>
-                </button>
-
-                {/* 3. Step-by-Step Problem Solver */}
-                <button
-                  onClick={() =>
-                    sendMessage('حل هذه المسألة: إذا تحرك جسم بتسارع 4 م/ث² من السكون لمدة 5 ثوانٍ، احسب المسافة المقطوعة والسرعة النهائية مع توضيح خطوات القانون والتعويض.')
-                  }
-                  className="p-4 rounded-2xl bg-[#232323] hover:bg-[#2B2B2B] border border-[#3A3A3A] transition-all text-right group"
-                >
-                  <div className="flex items-center gap-2 font-semibold text-sm text-white mb-1">
-                    <Calculator className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
-                    <span>{t.welcomeCard3Title}</span>
-                  </div>
-                  <p className="text-xs text-[#888888] leading-relaxed">
-                    {t.welcomeCard3Desc}
-                  </p>
-                </button>
-
-                {/* 4. Quiz Me */}
-                <button
-                  onClick={() => setQuizModalOpen(true)}
-                  className="p-4 rounded-2xl bg-[#232323] hover:bg-[#2B2B2B] border border-[#3A3A3A] transition-all text-right group"
-                >
-                  <div className="flex items-center gap-2 font-semibold text-sm text-white mb-1">
-                    <HelpCircle className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                    <span>{t.welcomeCard4Title}</span>
-                  </div>
-                  <p className="text-xs text-[#888888] leading-relaxed">
-                    {t.welcomeCard4Desc}
-                  </p>
-                </button>
-              </div>
             </div>
           ) : (
             /* Message List */
