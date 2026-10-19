@@ -24,6 +24,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings }) => {
     activeConversationId,
     selectConversation,
     createNewConversation,
+    startNewChat,
     renameConversation,
     deleteConversation,
     isSidebarOpen,
@@ -82,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings }) => {
         <div className="p-3 border-b border-[#3A3A3A] flex items-center justify-between">
           <button
             onClick={() => {
-              createNewConversation();
+              startNewChat();
               if (window.innerWidth < 768) setSidebarOpen(false);
             }}
             className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-[#232323] hover:bg-[#2B2B2B] text-white text-sm font-medium border border-[#3A3A3A] transition-colors"

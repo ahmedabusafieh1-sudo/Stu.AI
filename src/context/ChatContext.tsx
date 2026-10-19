@@ -66,6 +66,7 @@ interface ChatContextType {
   stopStreaming: () => void;
   retryLastMessage: () => Promise<void>;
   refreshConversation: (id?: string) => Promise<void>;
+  startNewChat: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -107,13 +108,18 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.ok) {
         const data = await res.json();
         setConversations(data.conversations || []);
-        if (data.conversations?.length > 0 && !activeConversationId) {
-          selectConversation(data.conversations[0].id);
-        }
+        // All previous conversations are safely preserved and stored in the history sidebar,
+        // while the user starts straight on a fresh, clean new chat!
       }
     } catch (err) {
       console.error('Failed to load conversations:', err);
     }
+  };
+
+  const startNewChat = () => {
+    setActiveConversationId(null);
+    setMessages([]);
+    setPendingAttachments([]);
   };
 
   const selectConversation = async (id: string) => {
@@ -584,6 +590,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         stopStreaming,
         retryLastMessage,
         refreshConversation,
+        startNewChat,
       }}
     >
       {children}

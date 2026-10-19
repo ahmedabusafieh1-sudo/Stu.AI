@@ -28,8 +28,8 @@ export default {
         }
       },
       fontFamily: {
-        arabic: ['"Noto Sans Arabic"', 'system-ui', '-apple-system', 'sans-serif'],
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        arabic: ['"Cairo"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Cairo"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       minHeight: {
         'screen-dvh': '100dvh',

@@ -8,7 +8,7 @@ export const TopNav: React.FC = () => {
   const {
     isSidebarOpen,
     setSidebarOpen,
-    createNewConversation,
+    startNewChat,
     useSearchGrounding,
     setUseSearchGrounding,
     setQuizModalOpen,
@@ -70,7 +70,7 @@ export const TopNav: React.FC = () => {
 
         {/* New Chat Button */}
         <button
-          onClick={() => createNewConversation()}
+          onClick={() => startNewChat()}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-[#e5e5e5] shadow transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
