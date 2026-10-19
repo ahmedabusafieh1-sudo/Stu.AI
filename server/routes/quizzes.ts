@@ -211,14 +211,15 @@ quizzesRouter.post('/', requireAuth, requireVerified, async (req: Request, res: 
     const insertedQuestions: any[] = [];
     for (let i = 0; i < generated.questions.length; i++) {
       const q = generated.questions[i];
+      const isEssay = q.questionType === 'essay' || !Array.isArray(q.options) || q.options.length < 2;
       const inserted = await db
         .insert(quizQuestions)
         .values({
           quizId: quiz.id,
           questionOrder: i + 1,
-          questionType: q.questionType,
+          questionType: isEssay ? 'essay' : 'mcq',
           questionText: q.questionText,
-          options: q.options || [],
+          options: isEssay ? [] : (q.options || []),
           correctKey: q.correctKey,
           explanation: q.explanation,
           points: q.points || 1,
@@ -431,7 +432,9 @@ quizzesRouter.post('/:id/submit', requireAuth, requireVerified, async (req: Requ
       const studentAns = studentAnswerMap.get(q.id) || '';
       totalMaxPoints += q.points;
 
-      if (q.questionType === 'mcq') {
+      const isMcq = q.questionType === 'mcq' && Array.isArray(q.options) && q.options.length >= 2;
+
+      if (isMcq) {
         // Objective MCQ Grading: compare student answer with correctKey
         const isMatch =
           studentAns.toLowerCase() === q.correctKey.toLowerCase() ||

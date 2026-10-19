@@ -491,64 +491,82 @@ export const QuizModal: React.FC = () => {
               </div>
 
               {/* Question Card */}
-              {activeQuiz.questions[currentQuestionIdx] && (
-                <div className="bg-[#171717] border border-[#3A3A3A] rounded-xl p-4 space-y-4">
-                  <h4 className="font-semibold text-sm text-white leading-relaxed" dir="auto">
-                    {activeQuiz.questions[currentQuestionIdx].questionText}
-                  </h4>
+              {activeQuiz.questions[currentQuestionIdx] && (() => {
+                const currentQ = activeQuiz.questions[currentQuestionIdx];
+                const qId = currentQ.id;
+                const isMcq = currentQ.questionType === 'mcq' && Array.isArray(currentQ.options) && currentQ.options.length >= 2;
+                const currentAnswer = studentAnswers[qId] || '';
 
-                  {/* MCQ Options */}
-                  {activeQuiz.questions[currentQuestionIdx].questionType === 'mcq' && (
-                    <div className="space-y-2">
-                      {activeQuiz.questions[currentQuestionIdx].options?.map((opt: string, i: number) => {
-                        const qId = activeQuiz.questions[currentQuestionIdx].id;
-                        const isSelected = studentAnswers[qId] === opt;
-                        return (
-                          <div
-                            key={i}
-                            onClick={() => handleAnswerSelect(qId, opt)}
-                            className={`flex items-center gap-3 p-3 rounded-xl border text-xs cursor-pointer transition-colors ${
-                              isSelected
-                                ? 'bg-[#2B2B2B] text-white border-white'
-                                : 'bg-[#232323] text-[#B5B5B5] border-[#3A3A3A] hover:bg-[#2B2B2B] hover:text-white'
-                            }`}
-                          >
+                return (
+                  <div className="bg-[#171717] border border-[#3A3A3A] rounded-xl p-4 sm:p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <h4 className="font-bold text-[15px] sm:text-base text-white leading-relaxed flex-1" dir="auto">
+                        {currentQ.questionText}
+                      </h4>
+                      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0 ${
+                        isMcq ? 'bg-blue-950/60 text-blue-300 border border-blue-800/50' : 'bg-purple-950/60 text-purple-300 border border-purple-800/50'
+                      }`}>
+                        {isMcq ? 'اختيار من متعدد' : 'سؤال مقالي / شرح ✍️'}
+                      </span>
+                    </div>
+
+                    {/* Case 1: Multiple Choice Options */}
+                    {isMcq ? (
+                      <div className="space-y-2.5 pt-1">
+                        {currentQ.options.map((opt: string, i: number) => {
+                          const isSelected = currentAnswer === opt;
+                          return (
                             <div
-                              className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                                isSelected ? 'border-white bg-white text-black' : 'border-[#666666]'
+                              key={i}
+                              onClick={() => handleAnswerSelect(qId, opt)}
+                              className={`flex items-center gap-3 p-3.5 rounded-xl border text-xs sm:text-sm cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'bg-[#2B2B2B] text-white border-white shadow-sm ring-1 ring-white/50'
+                                  : 'bg-[#232323] text-[#B5B5B5] border-[#3A3A3A] hover:bg-[#2B2B2B] hover:text-white'
                               }`}
                             >
-                              {isSelected && <div className="w-2 h-2 rounded-full bg-black" />}
+                              <div
+                                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                  isSelected ? 'border-white bg-white text-black' : 'border-[#666666]'
+                                }`}
+                              >
+                                {isSelected && <div className="w-2 h-2 rounded-full bg-black" />}
+                              </div>
+                              <span dir="auto" className="flex-1 leading-relaxed">
+                                {opt}
+                              </span>
                             </div>
-                            <span dir="auto" className="flex-1">
-                              {opt}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Essay Textarea */}
-                  {activeQuiz.questions[currentQuestionIdx].questionType === 'essay' && (
-                    <div>
-                      <textarea
-                        rows={4}
-                        value={studentAnswers[activeQuiz.questions[currentQuestionIdx].id] || ''}
-                        onChange={(e) =>
-                          handleAnswerSelect(
-                            activeQuiz.questions[currentQuestionIdx].id,
-                            e.target.value
-                          )
-                        }
-                        placeholder={t.essayPlaceholder}
-                        dir="auto"
-                        className="w-full bg-[#232323] text-white text-xs p-3 rounded-xl border border-[#3A3A3A] focus:outline-none focus:border-white leading-relaxed resize-none"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Case 2: Essay / Explanation / Problem-Solving Answer Box */
+                      <div className="space-y-2.5 pt-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <label className="font-bold text-amber-300 flex items-center gap-1.5">
+                            <span>✍️ اكتب إجابتك وشرحك أو خطوات الحل هنا:</span>
+                          </label>
+                          <span className="text-[11px] text-[#888888]">
+                            {currentAnswer.trim() ? `${currentAnswer.trim().length} حرف` : 'سيتم فهم حلك وتقييم خطواتك'}
+                          </span>
+                        </div>
+                        <textarea
+                          rows={6}
+                          value={currentAnswer}
+                          onChange={(e) => handleAnswerSelect(qId, e.target.value)}
+                          placeholder="اكتب إجابتك، شرحك، أو خطوات مسألتك هنا بأسلوبك الخاص وطريقتك... سيقوم المصحح الذكي بقراءة حلك كاملاً وفهم خطواتك وتقييمك بعدل."
+                          dir="auto"
+                          className="w-full bg-[#232323] text-white text-sm p-3.5 rounded-xl border border-[#3A3A3A] focus:outline-none focus:border-white focus:ring-1 focus:ring-white/40 leading-[1.75] resize-none transition-colors"
+                        />
+                        <div className="p-2.5 bg-[#202022] rounded-lg text-[11px] text-[#A0A0A0] flex items-center gap-2 border border-[#2B2B2B]">
+                          <span>💡</span>
+                          <span>المصحح الذكي يقرأ خطواتك وطريقتك ويفهم تعبيرك، ولا يشترط حفظ الكلمات بالنص!</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Navigation Controls */}
               <div className="flex items-center justify-between pt-2">
@@ -714,43 +732,51 @@ export const QuizModal: React.FC = () => {
                   )}
 
                   {/* Detailed Breakdown */}
-                  <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
+                  <div className="space-y-3.5 max-h-[42vh] overflow-y-auto pr-1">
                     {quizResults.results?.map((res: any, idx: number) => (
                       <div
                         key={idx}
-                        className="p-3.5 bg-[#171717] border border-[#3A3A3A] rounded-xl text-xs space-y-2"
+                        className="p-4 bg-[#171717] border border-[#3A3A3A] rounded-xl text-xs sm:text-sm space-y-2.5"
                       >
-                        <div className="flex items-center justify-between font-semibold text-white">
+                        <div className="flex items-center justify-between font-bold text-white text-xs sm:text-sm">
                           <span>السؤال {res.questionOrder} ({res.topic})</span>
-                          <span className={res.isCorrect ? 'text-emerald-400' : 'text-red-400'}>
+                          <span className={res.isCorrect ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
                             {res.earnedPoints} / {res.points} درجة {res.isCorrect ? '✅' : '❌'}
                           </span>
                         </div>
 
-                        <p className="text-[#F5F5F5]" dir="auto">
+                        <p className="text-[#F5F5F5] font-semibold leading-relaxed" dir="auto">
                           {res.questionText}
                         </p>
 
-                        <div className="p-2.5 rounded bg-[#232323] space-y-1.5">
+                        <div className="p-3 rounded-xl bg-[#232323] space-y-2.5 text-xs sm:text-sm">
                           <div>
-                            <span className="text-[#888888]">{t.yourAnswer} </span>
-                            <span className={res.isCorrect ? 'text-emerald-300' : 'text-red-300'}>
-                              {res.studentAnswer || '[فارغ]'}
+                            <span className="text-[#888888] font-medium block mb-1">إجابتك وشرحك:</span>
+                            <span className={`block font-medium whitespace-pre-wrap leading-relaxed ${res.isCorrect ? 'text-emerald-300' : 'text-red-300'}`}>
+                              {res.studentAnswer || '[فارغ - لم تتم الإجابة]'}
                             </span>
                           </div>
+
                           {!res.isCorrect && (
                             <div>
-                              <span className="text-[#888888]">الإجابة النموذجية: </span>
-                              <span className="text-emerald-300 font-medium">{res.correctKey}</span>
+                              <span className="text-[#888888] font-medium block mb-1">الإجابة النموذجية المرجعية:</span>
+                              <span className="text-emerald-300 font-medium block whitespace-pre-wrap leading-relaxed">{res.correctKey}</span>
                             </div>
                           )}
+
                           <div>
-                            <span className="text-[#888888]">التفسير والشرح: </span>
-                            <span className="text-[#B5B5B5]">{res.explanation}</span>
+                            <span className="text-[#888888] font-medium block mb-1">التفسير والشرح العلمي:</span>
+                            <span className="text-[#B5B5B5] block leading-relaxed">{res.explanation}</span>
                           </div>
+
                           {res.aiFeedback && (
-                            <div className="text-blue-300 pt-1 text-[11px]">
-                              💡 ملاحظات المصحح: {res.aiFeedback}
+                            <div className="mt-2.5 p-3 rounded-lg bg-blue-950/40 border border-blue-800/50 text-blue-200 text-xs sm:text-sm space-y-1">
+                              <span className="text-blue-400 font-bold flex items-center gap-1.5">
+                                <span>🧠 تقييم المصحح الذكي وفهم حلك:</span>
+                              </span>
+                              <p className="leading-relaxed whitespace-pre-wrap text-[#D5E3FC]">
+                                {res.aiFeedback}
+                              </p>
                             </div>
                           )}
                         </div>

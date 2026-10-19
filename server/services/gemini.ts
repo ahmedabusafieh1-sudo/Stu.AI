@@ -441,8 +441,12 @@ ${options.customTopic ? `- مواصفات وشكل الكويز المطلوبة
    - يجب أن تحتوي على 4 خيارات حصرية وواضحة (options: [A, B, C, D]).
    - إجابة واحدة صحيحة ومحددة تماماً توضع في "correctKey" (نص الإجابة الصحيحة أو حرفها).
    - المشتتات الثلاثة الأخرى منطقية ولا توجد خيارات مكررة أو تافهة.
-2. للأسئلة المقالية (essay):
-   - "correctKey" يحتوي على الإجابة النموذجية ومعايير التصحيح (Rubric) والنقاط المفتاحية المطلوبة لاحتساب الدرجة.
+   - questionType يكون strictly "mcq".
+2. للأسئلة المقالية أو الشرح وحل المسائل (essay):
+   - questionType يكون strictly "essay".
+   - لا تضع أي خيارات، واجعل options: null أو مصفوفة فارغة [] (بدون خيارات إطلاقاً).
+   - السؤال يطلب بوضوح من الطالب أن يشرح أو يحل أو يعلل أو يستنتج (مثل: "اشرح بالتفصيل كيف..."، "علل سبب..."، "حل المسألة التالية موضحاً خطواتك...").
+   - "correctKey" يحتوي على الإجابة النموذجية ومعايير التصحيح والنقاط الأساسية التي سيتم تقييم فهم الطالب بناءً عليها.
 3. التفسير (explanation):
    - لكل سؤال، اشرح بوضوح سبب صحة الإجابة النموذجية وسبب خطأ المشتتات، مع الاستشهاد المباشر بالمصدر أو الصورة المرفقة.
 4. مراجع المصدر (sourceReferences):
@@ -523,7 +527,17 @@ ${sourcesData
             const correctKey = q.correctKey || q.correct_answer || q.correctAnswer || q.answer || '';
             const explanation = q.explanation || q.reason || q.rationale || 'تفسير الإجابة النموذجية';
             const rawOptions = Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : undefined;
+            const validOptions = rawOptions?.map((opt: any) => String(opt).trim()).filter(Boolean);
             
+            const isEssay =
+              q.questionType === 'essay' ||
+              q.questionType === 'short_answer' ||
+              q.questionType === 'explain' ||
+              q.questionType === 'open' ||
+              q.questionType === 'text' ||
+              !validOptions ||
+              validOptions.length < 2;
+
             let sourceReferences: any[] = [];
             if (Array.isArray(q.sourceReferences)) {
               sourceReferences = q.sourceReferences;
@@ -533,9 +547,9 @@ ${sourcesData
 
             return {
               questionOrder: q.questionOrder || i + 1,
-              questionType: q.questionType === 'essay' ? 'essay' : 'mcq',
+              questionType: isEssay ? 'essay' : 'mcq',
               questionText: String(questionText),
-              options: rawOptions?.map((opt: any) => String(opt)),
+              options: isEssay ? undefined : validOptions,
               correctKey: String(correctKey),
               explanation: String(explanation),
               points: Number(q.points) || 1,
@@ -571,23 +585,51 @@ export async function gradeEssayAnswer(
   }
 
   const modelName = getModelName('fast');
+  const candidateModels = [
+    modelName,
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-flash-lite-latest',
+  ]
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .filter((m) => !m.includes('3.8'));
 
   return await retryWithBackoff(async () => {
     const genAI = new GoogleGenerativeAI(apiKey);
     const prompt = `
-أنت مصحح دراسي أكاديمي عادل ومرن.
-قم بتقييم إجابة الطالب المقالية بناءً على الإجابة النموذجية والمعنى العلمي الصحيح، وليس تطابق الكلمات الحرفي فقط.
+أنت أستاذ ومعلم أكاديمي ذكي، متفهم وعادل.
+مهمتك الأساسية هي أن تقرأ إجابة الطالب وشرحه أو خطوات مسألته بعناية فائقة، وتفهم منطقه وتفكيره وخطواته، وتقيّم فهمه واستيعابه الحقيقي للمفهوم، وليس مجرد المطابقة الحرفية للكلمات أو الأرقام!
 
-السؤال: ${questionText}
-الإجابة النموذجية والمعايير: ${modelAnswer}
-إجابة الطالب: ${studentAnswer}
-الدرجة القصوى: ${maxPoints}
+السؤال أو المسألة:
+${questionText}
 
-المطلوب:
-1. تقييم هل استوفى الطالب المعنى العلمي أو النقاط الأساسية.
-2. حساب الدرجة المستحقة من 0 إلى ${maxPoints}.
-3. تقديم تعليق توضيحي بناء وإيجابي للطالب (Feedback) يوضح ما أصاب فيه وما نقصه.
-4. أخرج النتيجة ككائن JSON فقط:
+الإجابة النموذجية والمعايير المرجعية:
+${modelAnswer}
+
+ما كتبه الطالب كحل وشرح:
+"${studentAnswer}"
+
+الدرجة الكاملة للسؤال: ${maxPoints}
+
+قواعد التقييم الأكاديمي الذكي:
+1. **فهم طريقة الطالب وأسلوبه (Comprehension over Memorization)**:
+   - اقرأ ما كتبه الطالب بتمعن وتفهّم المعنى الذي يقصده بأسلوبه الخاص، أو بكلماته، أو بلهجته وعفويته.
+   - إذا كان المفهوم العلمي أو المنطقي الذي ذكره صحيحاً، اعتبر إجابته صحيحة تماماً حتى لو استخدم كلمات أو صياغة أو ترتيباً مختلفاً عن الإجابة النموذجية.
+   - إذا كان السؤال مسألة حسابية أو تطبيقية: انظر إلى خطوات حله، قانونه، وطريقة تعويضه وتسلسله، وليس مجرد الناتج النهائي فقط.
+2. **احتساب الدرجة العادلة (Fair Scoring & Partial Credit)**:
+   - إذا أوضح الفكرة الجوهرية بأسلوبه: يستحق الدرجة الكاملة (${maxPoints}).
+   - إذا ذكر معظم الفكرة مع إغفال جزئية ثانوية بسيطة: امنحه معظم الدرجة (مثال: من 70% إلى 90% من الدرجة).
+   - إذا أظهر بداية صحيحة أو فهماً جزئياً أو كتب القانون والتعويض الصحيح: امنحه درجات جزئية مستحقة ولا تحرمه من جهده.
+   - فقط إذا كانت الإجابة خاطئة كلياً أو متناقضة مع المفهوم: امنحه 0.
+3. **التعليق التوضيحي البناء والمفصل (Constructive Feedback)**:
+   - اكتب تعليقاً حياً وموجهاً للطالب يُشعره بأنك قرأت كل كلمة كتبها وفهمتها بدقة.
+   - ابدأ بما أصاب فيه تحديداً (مثال: "قراءتي لحلك: أحسنت في توضيحك لـ... وفهمك لمنطق...").
+   - اذكر له بلطف ما ينقصه ليكتمل الجواب تماماً، أو نصيحة لتطوير صياغته مستقبلاً.
+4. **حالة الصحة (isCorrect)**:
+   - ضع isCorrect = true إذا كانت إجابته صحيحة أو مقبولة في جوهرها (نال نصف الدرجة فأكثر).
+   - ضع isCorrect = false فقط إذا كانت الإجابة غير مقبولة أو خاطئة.
+
+أخرج النتيجة ككائن JSON فقط بالصيغة التالية دون أي نص إضافي:
 {
   "earnedPoints": number,
   "isCorrect": boolean,
@@ -595,21 +637,36 @@ export async function gradeEssayAnswer(
 }
 `;
 
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-      },
-    });
+    let lastErr: any = null;
+    for (const curModel of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: curModel,
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.2,
+          },
+        });
 
-    const result = await model.generateContent(prompt);
-    const parsed = JSON.parse(result.response.text());
+        const result = await model.generateContent(prompt);
+        let raw = result.response.text().trim();
+        if (raw.startsWith('```')) {
+          raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        }
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
 
-    return {
-      earnedPoints: Math.min(maxPoints, Math.max(0, Number(parsed.earnedPoints) || 0)),
-      isCorrect: Boolean(parsed.isCorrect),
-      feedback: parsed.feedback || 'تم تقييم الإجابة تقديراً آلياً.',
-    };
+        return {
+          earnedPoints: Math.min(maxPoints, Math.max(0, Number(parsed.earnedPoints) || 0)),
+          isCorrect: Boolean(parsed.isCorrect),
+          feedback: parsed.feedback || 'تم فحص وقراءة إجابتك وتقييمها بناءً على الفهم والمنطق العلمي.',
+        };
+      } catch (err: any) {
+        lastErr = err;
+        console.warn(`[ESSAY_GRADE_MODEL_RETRY] Model ${curModel} failed: ${err.message}. Retrying next model...`);
+      }
+    }
+
+    throw lastErr || new Error('فشل تقييم السؤال المقالي.');
   });
 }
