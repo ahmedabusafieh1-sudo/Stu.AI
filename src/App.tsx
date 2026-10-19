@@ -200,7 +200,7 @@ export const App: React.FC = () => {
                   <div className="max-w-[92%] sm:max-w-[85%] rounded-2xl px-4 py-3 bg-[#1E1E1E] text-[#F5F5F5] border border-[#2B2B2B] shadow-sm">
                     <div dir="auto" className="break-words select-text">
                       {streamingContent ? (
-                        <p className="text-sm text-[#F5F5F5] leading-relaxed whitespace-pre-wrap">
+                        <p className="text-[15px] sm:text-base text-[#F5F5F5] leading-[1.75] whitespace-pre-wrap">
                           {streamingContent}
                           <span className="inline-block w-1.5 h-4 mr-1 bg-blue-400 animate-pulse align-middle" />
                         </p>

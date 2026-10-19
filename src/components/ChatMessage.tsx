@@ -73,13 +73,13 @@ function renderFormattedContent(content: string) {
     // Check for educational headings / list items
     if (line.startsWith('### ')) {
       parts.push(
-        <h4 key={lineIdx} className="text-sm font-bold text-white mt-3 mb-1">
+        <h4 key={lineIdx} className="text-[15px] font-semibold text-white mt-3.5 mb-1.5">
           {line.replace('### ', '')}
         </h4>
       );
     } else if (line.startsWith('## ')) {
       parts.push(
-        <h3 key={lineIdx} className="text-base font-bold text-blue-400 mt-4 mb-2 border-b border-[#3A3A3A] pb-1">
+        <h3 key={lineIdx} className="text-base font-bold text-blue-400 mt-4 mb-2 border-b border-[#3A3A3A]/60 pb-1.5">
           {line.replace('## ', '')}
         </h3>
       );
@@ -91,28 +91,28 @@ function renderFormattedContent(content: string) {
       );
     } else if (line.startsWith('- ') || line.startsWith('* ')) {
       parts.push(
-        <li key={lineIdx} className="mr-4 my-1 list-disc text-sm text-[#F5F5F5]">
+        <li key={lineIdx} className="mr-5 my-1.5 list-disc text-[15px] text-[#F5F5F5] leading-[1.75]">
           {renderedTokens}
         </li>
       );
     } else if (/^\d+\.\s/.test(line)) {
       parts.push(
-        <li key={lineIdx} className="mr-4 my-1 list-decimal text-sm text-[#F5F5F5]">
+        <li key={lineIdx} className="mr-5 my-1.5 list-decimal text-[15px] text-[#F5F5F5] leading-[1.75]">
           {renderedTokens}
         </li>
       );
     } else if (line.trim() === '') {
-      parts.push(<div key={lineIdx} className="h-2" />);
+      parts.push(<div key={lineIdx} className="h-2.5" />);
     } else {
       parts.push(
-        <p key={lineIdx} className="my-1 text-sm text-[#F5F5F5] leading-relaxed">
+        <p key={lineIdx} className="my-1.5 text-[15px] text-[#F5F5F5] leading-[1.75]">
           {renderedTokens}
         </p>
       );
     }
   });
 
-  return <div className="space-y-0.5">{parts}</div>;
+  return <div className="space-y-1">{parts}</div>;
 }
 
 function formatInlineText(text: string, keyPrefix: string): React.ReactNode {
@@ -200,7 +200,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   return (
     <div className={`py-4 px-4 sm:px-6 flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
       <div
-        className={`max-w-[92%] sm:max-w-[85%] rounded-2xl px-4 py-3.5 transition-all shadow-sm ${
+        className={`max-w-[92%] sm:max-w-[85%] rounded-2xl px-4 py-3.5 sm:px-5 sm:py-4 transition-all shadow-sm ${
           isUser
             ? 'bg-[#2B2B2B] text-white border border-[#3A3A3A]'
             : 'bg-[#1E1E1E] text-[#F5F5F5] border border-[#2B2B2B]'

@@ -11,8 +11,12 @@
   body {
     background-color: #171717;
     color: #F5F5F5;
-    font-family: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    line-height: 1.65;
+    font-family: -apple-system, BlinkMacSystemFont, "Tajawal", "Segoe UI", Roboto, "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
+    line-height: 1.75;
+    letter-spacing: normal;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     margin: 0;
     padding: 0;
     height: 100%;

@@ -28,8 +28,8 @@ export default {
         }
       },
       fontFamily: {
-        arabic: ['"Cairo"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        sans: ['"Cairo"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        arabic: ['-apple-system', 'BlinkMacSystemFont', '"Tajawal"', '"Segoe UI"', 'Roboto', '"IBM Plex Sans Arabic"', '"Noto Sans Arabic"', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"Tajawal"', '"Segoe UI"', 'Roboto', '"IBM Plex Sans Arabic"', '"Noto Sans Arabic"', 'sans-serif'],
       },
       minHeight: {
         'screen-dvh': '100dvh',

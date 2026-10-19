@@ -219,7 +219,7 @@ export const ChatInput: React.FC = () => {
             placeholder=""
             dir="auto"
             rows={1}
-            className="flex-1 bg-transparent text-[#F5F5F5] placeholder-[#888888] text-sm resize-none focus:outline-none max-h-44 py-1.5 px-1 leading-relaxed"
+            className="flex-1 bg-transparent text-[#F5F5F5] placeholder-[#888888] text-[15px] resize-none focus:outline-none max-h-44 py-1.5 px-1 leading-[1.6]"
           />
 
           {/* Google Search Toggle Button */}
