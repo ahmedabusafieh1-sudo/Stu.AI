@@ -116,35 +116,77 @@ function renderFormattedContent(content: string) {
 }
 
 function formatInlineText(text: string, keyPrefix: string): React.ReactNode {
-  // Bold **text**
-  const boldRegex = /(\*\*.*?\*\*)/g;
-  const segments = text.split(boldRegex);
+  // 1. Process inline code `...`
+  const codeRegex = /(`[^`]+?`)/g;
+  const codeSegments = text.split(codeRegex);
 
-  return segments.map((seg, i) => {
-    if (seg.startsWith('**') && seg.endsWith('**')) {
+  return codeSegments.map((codeSeg, cIdx) => {
+    if (codeSeg.startsWith('`') && codeSeg.endsWith('`')) {
+      const codeContent = codeSeg.slice(1, -1);
       return (
-        <strong key={`${keyPrefix}-b-${i}`} className="font-semibold text-white">
-          {seg.slice(2, -2)}
-        </strong>
+        <code
+          key={`${keyPrefix}-code-${cIdx}`}
+          dir="ltr"
+          style={{ unicodeBidi: 'isolate', direction: 'ltr' }}
+          className="inline-block px-1.5 py-0.5 mx-0.5 text-[13px] font-mono bg-[#1E1E1E] text-emerald-300 border border-[#3A3A3A] rounded align-baseline font-medium"
+        >
+          {codeContent}
+        </code>
       );
     }
 
-    // Highlight citations e.g. [filename, page X]
-    const citationRegex = /(\[[^\]]+?(?:,\s*(?:صفحة|ص|page|slide|شريحة)\s*\d+)?\])/gi;
-    const subSegments = seg.split(citationRegex);
+    // 2. Process bold **...**
+    const boldRegex = /(\*\*.*?\*\*)/g;
+    const boldSegments = codeSeg.split(boldRegex);
 
-    return subSegments.map((sub, j) => {
-      if (sub.startsWith('[') && sub.endsWith(']')) {
+    return boldSegments.map((boldSeg, bIdx) => {
+      if (boldSeg.startsWith('**') && boldSeg.endsWith('**')) {
+        const boldContent = boldSeg.slice(2, -2);
         return (
-          <span
-            key={`${keyPrefix}-c-${j}`}
-            className="inline-block px-1.5 py-0.5 mx-0.5 text-[11px] font-mono bg-[#2B2B2B] text-blue-300 border border-[#3A3A3A] rounded"
-          >
-            {sub}
-          </span>
+          <strong key={`${keyPrefix}-b-${cIdx}-${bIdx}`} className="font-semibold text-white">
+            {boldContent}
+          </strong>
         );
       }
-      return sub;
+
+      // 3. Highlight citations e.g. [filename, page X]
+      const citationRegex = /(\[[^\]]+?(?:,\s*(?:صفحة|ص|page|slide|شريحة)\s*\d+)?\])/gi;
+      const citationSegments = boldSeg.split(citationRegex);
+
+      return citationSegments.map((sub, j) => {
+        if (sub.startsWith('[') && sub.endsWith(']')) {
+          return (
+            <span
+              key={`${keyPrefix}-c-${cIdx}-${bIdx}-${j}`}
+              className="inline-block px-1.5 py-0.5 mx-0.5 text-[11px] font-mono bg-[#2B2B2B] text-blue-300 border border-[#3A3A3A] rounded"
+            >
+              {sub}
+            </span>
+          );
+        }
+
+        // 4. BiDi isolation for English words/terms with dashes/hyphens (e.g. anti-, -able, A - B, well-known)
+        // Matches English prefixes (anti-), suffixes (-able), compound words (self-esteem), or terms (A - B)
+        const isDashPattern = /^(?:[a-zA-Z0-9]+-[a-zA-Z0-9-]*|-[a-zA-Z0-9]+[a-zA-Z0-9-]*|[a-zA-Z0-9]+-|\b[a-zA-Z0-9]+\s*[-–—]\s*[a-zA-Z0-9]+)$/;
+        const dashSplitRegex = /((?:[a-zA-Z0-9]+-[a-zA-Z0-9-]*|-[a-zA-Z0-9]+[a-zA-Z0-9-]*|[a-zA-Z0-9]+-|\b[a-zA-Z0-9]+\s*[-–—]\s*[a-zA-Z0-9]+))/g;
+        const bidiTokens = sub.split(dashSplitRegex);
+
+        return bidiTokens.map((token, k) => {
+          if (isDashPattern.test(token.trim())) {
+            return (
+              <span
+                key={`${keyPrefix}-dash-${cIdx}-${bIdx}-${j}-${k}`}
+                dir="ltr"
+                style={{ unicodeBidi: 'isolate', direction: 'ltr' }}
+                className="isolate-bidi inline-block font-sans font-medium text-emerald-300 px-0.5"
+              >
+                {token}
+              </span>
+            );
+          }
+          return token;
+        });
+      });
     });
   });
 }

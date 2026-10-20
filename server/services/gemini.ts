@@ -25,6 +25,21 @@ export interface GeminiRequestOptions {
 // ----------------------------------------------------
 // System Prompt for Stu.Ai
 // ----------------------------------------------------
+// ----------------------------------------------------
+// BiDi & Bilingual Guidelines
+// ----------------------------------------------------
+const bidiAndBilingualDirective = `
+3. دقة اتجاه الكلمات والرموز والشرطات الإنجليزية (Strict BiDi & Hyphen Preservation):
+   - عند ذكر كلمات بالإنجليزية بجانبها شرطات (hyphens/dashes)، أو سوابق (Prefixes مثل \`pre-\`, \`un-\`, \`anti-\`)، أو لواحق (Suffixes مثل \`-tion\`, \`-able\`, \`-ing\`, \`-ed\`)، أو مقارنات (مثل \`Word - Definition\`):
+   - احرص تماماً على عدم عكس مكان الشرطة أو ترتيب الكلمات الإنجليزية أبداً!
+   - ضع دائماً الكلمة الإنجليزية أو الرمز أو السابقة/اللاحقة مع شرطتها داخل علامات الكود (Backticks) مثل: \`-able\` أو \`un-\` أو \`term - meaning\`. وضعها داخل الكود يحفظ اتجاهها البرمجي (LTR) ويمنع المتصفح من عكس الشرطة لليمين أو اليسار.
+
+4. إتقان اللغتين العربية والإنجليزية بطلاقة تامة (Native Bilingual Mastery):
+   - أنت متقن للغتين العربية والإنجليزية بطلاقة وفصاحة تامة وعالية المستوى.
+   - إذا سألك الطالب بالإنجليزية أجب بالإنجليزية بطلاقة أكاديمية سلسة.
+   - إذا سألك بالعربية أجب بالعربية. وإذا مزج بين اللغتين أو سأل عن ترجمة أو مقارنة، اشرح اللغتين بدقة ووضوح.
+`;
+
 export function buildSystemInstruction(
   actionType: string = 'normal',
   preferredLanguage: string = 'auto'
@@ -80,6 +95,8 @@ export function buildSystemInstruction(
    - إذا كان سؤالاً مفاهيمياً: اشرح المفهوم الأساسي بلغة واضحة وبسيطة دون تكلف.
    - إذا سألك الطالب أو سلم عليك، رد بلطف وسرعة وذكاء.
    - إذا طلب الطالب أي تعديل (مثل "بسّط" أو "أعطني مثالاً" أو "لخص")، استجب فوراً وبدقة.
+
+${bidiAndBilingualDirective}
 
 ${langDirective}
 ${actionDirective}
@@ -668,5 +685,141 @@ ${modelAnswer}
     }
 
     throw lastErr || new Error('فشل تقييم السؤال المقالي.');
+  });
+}
+
+// ----------------------------------------------------
+// 5. Intelligent Concept Map Generator
+// ----------------------------------------------------
+export interface ConceptMapData {
+  title: string;
+  centralConcept: string;
+  summary: string;
+  branches: {
+    id: string;
+    title: string;
+    color: string;
+    nodes: {
+      id: string;
+      label: string;
+      details?: string;
+      subNodes?: string[];
+    }[];
+  }[];
+  relationships?: {
+    from: string;
+    to: string;
+    label: string;
+  }[];
+}
+
+export async function generateConceptMapWithGemini(
+  sourcesData: { fileName: string; unitIndex: number; text: string }[],
+  options: {
+    topic?: string;
+    language?: 'ar' | 'en';
+    imagesData?: { mimeType: string; buffer: Buffer; fileName?: string }[];
+  }
+): Promise<ConceptMapData> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error('خدمة خريطة المفاهيم غير متاحة: GEMINI_API_KEY غير مضبوط.');
+  }
+
+  const modelName = getModelName('accurate');
+  const candidateModels = [
+    modelName,
+    'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-flash-lite-latest',
+  ]
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .filter((m) => !m.includes('3.8'));
+
+  const prompt = `
+أنت خبير تربوي متخصص في بناء وتصميم خرائط المفاهيم الذهنية والأكاديمية التفاعلية عالية الدقة.
+مهمتك: استخراج خريطة مفاهيم متكاملة، منظمة وواضحة جداً ودقيقة علمياً من المواد المعطاة أدناه.
+
+مواصفات الخريطة المطلوبة:
+${options.topic ? `- موضوع أو درس الخريطة: ${options.topic}` : '- استخرج خريطة المفاهيم لأهم موضوع متضمن في المواد المعطاة.'}
+- اللغة: ${options.language === 'en' ? 'English' : 'اللغة العربية'}
+
+هيكلية خريطة المفاهيم:
+1. "centralConcept": المفهوم الرئيسي أو عنوان الدرس المركزي في قلب الخريطة.
+2. "title": عنوان الخريطة بشكل أكاديمي واضح.
+3. "summary": فكرة عامة مكثفة في سطرين تلخص الرابط بين جميع المفاهيم.
+4. "branches": من 3 إلى 5 محاور رئيسية تتفرع من المفهوم المركزي. لكل محور:
+   - "id": معرّف فريد (مثل "b1", "b2", ...).
+   - "title": اسم المحور الرئيسي.
+   - "color": لون مميز للمحور (اختر من: "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899", "#06B6D4").
+   - "nodes": المفاهيم الفرعية التابعة لهذا المحور (من 2 إلى 4 مفاهيم). لكل مفهوم:
+     - "id": معرّف فريد (مثل "b1_1").
+     - "label": اسم المفهوم الفرعي أو القانون أو المصطلح بدقة.
+     - "details": شرح أو قانون أو مثال موجز جداً ومركّز (سطر واحد).
+     - "subNodes": قائمة بنقاط فرعية إضافية أو أمثلة موجزة جداً إن وجدت.
+5. "relationships": علاقات ترابطية مباشرة أو أسهم بين المفاهيم (مثال: من "المفهوم أ" إلى "المفهوم ب" مع كلمة رابطة مثل "يؤدي إلى"، "يتفرع منه"، "يقاس بـ").
+
+أخرج النتيجة بصيغة JSON متوافقة بدقة مع المخطط أعلاه دون أي نصوص أخرى خارج كائن JSON.
+
+المصادر والمواد المعطاة:
+${sourcesData
+  .slice(0, 6)
+  .map(
+    (s) =>
+      `[المصدر: ${s.fileName} | الصفحة: ${s.unitIndex}]\n${s.text.slice(0, 1000)}\n[نهاية المصدر]`
+  )
+  .join('\n\n')}
+`.trim();
+
+  return await retryWithBackoff(async () => {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const parts: any[] = [];
+
+    if (options.imagesData && options.imagesData.length > 0) {
+      for (const img of options.imagesData) {
+        if (img.buffer && (img.mimeType.startsWith('image/') || img.mimeType === 'application/pdf')) {
+          parts.push({
+            inlineData: {
+              mimeType: img.mimeType,
+              data: img.buffer.toString('base64'),
+            },
+          });
+        }
+      }
+    }
+
+    parts.push({ text: prompt });
+
+    let lastError: any = null;
+    for (const curModel of candidateModels) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: curModel,
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.2,
+          },
+        });
+
+        const result = await model.generateContent(parts);
+        let raw = result.response.text().trim();
+        if (raw.startsWith('```')) {
+          raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        }
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+
+        if (!parsed.centralConcept && parsed.title) {
+          parsed.centralConcept = parsed.title;
+        }
+
+        return parsed as ConceptMapData;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[CONCEPT_MAP_MODEL_FALLBACK] Model ${curModel} failed: ${err.message}. Retrying...`);
+      }
+    }
+
+    throw lastError || new Error('فشل توليد خريطة المفاهيم.');
   });
 }

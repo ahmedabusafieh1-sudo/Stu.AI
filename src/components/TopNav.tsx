@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Plus, Globe, HelpCircle } from 'lucide-react';
+import { Menu, Plus, Globe, HelpCircle, BookOpen, Network } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 
@@ -12,6 +12,8 @@ export const TopNav: React.FC = () => {
     useSearchGrounding,
     setUseSearchGrounding,
     setQuizModalOpen,
+    setNotesModalOpen,
+    setConceptMapOpen,
   } = useChat();
 
   return (
@@ -56,6 +58,27 @@ export const TopNav: React.FC = () => {
         >
           <Globe className={`w-3.5 h-3.5 ${useSearchGrounding ? 'text-blue-400 animate-pulse' : ''}`} />
           <span className="hidden sm:inline">{t.googleSearch}</span>
+        </button>
+
+        {/* Study Notes Button */}
+        <button
+          onClick={() => setNotesModalOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm"
+          title={t.notesTitle}
+        >
+          <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+          <span>{t.notesButton}</span>
+        </button>
+
+        {/* Concept Map Button */}
+        <button
+          onClick={() => setConceptMapOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm"
+          title={t.conceptMapTitle}
+        >
+          <Network className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="hidden sm:inline">{t.conceptMapButton}</span>
+          <span className="sm:hidden">خريطة</span>
         </button>
 
         {/* Quiz Button */}

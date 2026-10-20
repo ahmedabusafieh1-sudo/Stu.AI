@@ -229,8 +229,18 @@ async function ensureTablesCreated() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
+    CREATE TABLE IF NOT EXISTS notes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT 'مذكرة جديدة',
+      content TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
     -- Performance and Isolation Indexes
     CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, sequence ASC);
     CREATE INDEX IF NOT EXISTS idx_attachments_user ON attachments(user_id);
     CREATE INDEX IF NOT EXISTS idx_source_units_attachment ON source_units(attachment_id, unit_index ASC);

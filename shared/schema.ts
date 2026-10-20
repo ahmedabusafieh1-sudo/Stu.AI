@@ -282,6 +282,24 @@ export const submitQuizSchema = z.object({
   idempotencyKey: z.string().max(128).optional(),
 });
 
+// ==========================================
+// 6. Study Notes (المذكرات)
+// ==========================================
+export const notes = pgTable('notes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').default('مذكرة جديدة').notNull(),
+  content: text('content').default('').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const saveNoteSchema = z.object({
+  id: z.string().uuid().optional(),
+  title: z.string().max(200).default('مذكرة جديدة'),
+  content: z.string().max(50000).default(''),
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type UserSettings = typeof userSettings.$inferSelect;
@@ -293,3 +311,4 @@ export type Quiz = typeof quizzes.$inferSelect;
 export type QuizQuestion = typeof quizQuestions.$inferSelect;
 export type QuizAttempt = typeof quizAttempts.$inferSelect;
 export type QuizAnswer = typeof quizAnswers.$inferSelect;
+export type Note = typeof notes.$inferSelect;

@@ -19,6 +19,7 @@ interface AuthContextType {
   settings: UserSettings;
   isLoading: boolean;
   t: (typeof translations)['ar'];
+  setUiLanguage: (lang: Language) => Promise<void>;
   login: (email: string, password: string) => Promise<{ success: boolean; needsVerification?: boolean; email?: string; error?: string }>;
   register: (displayName: string, email: string, password: string, confirmPassword: string) => Promise<{ success: boolean; email?: string; error?: string }>;
   verifyOtp: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
@@ -28,8 +29,16 @@ interface AuthContextType {
   refreshAuth: () => Promise<void>;
 }
 
+const getInitialLanguage = (): Language => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('stu_ui_language');
+    if (saved === 'ar' || saved === 'en') return saved;
+  }
+  return 'ar';
+};
+
 const defaultSettings: UserSettings = {
-  uiLanguage: 'ar',
+  uiLanguage: getInitialLanguage(),
   preferredExplanationLang: 'auto',
   searchGroundingDefault: false,
 };
@@ -200,6 +209,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const setUiLanguage = async (lang: Language) => {
+    setSettings((prev) => ({ ...prev, uiLanguage: lang }));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stu_ui_language', lang);
+    }
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    if (user) {
+      await updateSettings({ uiLanguage: lang });
+    }
+  };
+
   const currentT = translations[settings.uiLanguage] || translations.ar;
 
   return (
@@ -209,6 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         settings,
         isLoading,
         t: currentT,
+        setUiLanguage,
         login,
         register,
         verifyOtp,

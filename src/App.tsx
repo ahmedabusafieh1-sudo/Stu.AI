@@ -10,6 +10,8 @@ import { Sidebar } from './components/Sidebar';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { QuizModal } from './components/QuizModal';
+import { NotesModal } from './components/NotesModal';
+import { ConceptMapModal } from './components/ConceptMapModal';
 import { SettingsModal } from './components/SettingsModal';
 import { AuthModal } from './components/AuthModal';
 
@@ -168,6 +170,12 @@ export const App: React.FC = () => {
 
       {/* Interactive Quiz Modal */}
       <QuizModal />
+
+      {/* Study Notes Modal */}
+      <NotesModal />
+
+      {/* Smart Concept Map Modal */}
+      <ConceptMapModal />
 
       {/* User Settings Modal */}
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setSettingsOpen(false)} />

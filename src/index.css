@@ -57,6 +57,14 @@
   padding: 4px 0;
 }
 
+/* Strict BiDi Isolation for Code and Hyphenated English Terms in RTL */
+[dir="rtl"] code,
+[dir="rtl"] .isolate-bidi,
+[dir="rtl"] span[dir="ltr"] {
+  unicode-bidi: isolate !important;
+  direction: ltr !important;
+}
+
 /* Respect Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   * {

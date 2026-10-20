@@ -15,6 +15,8 @@ import { authRouter } from './routes/auth.js';
 import { attachmentsRouter } from './routes/attachments.js';
 import { chatRouter } from './routes/chat.js';
 import { quizzesRouter } from './routes/quizzes.js';
+import { notesRouter } from './routes/notes.js';
+import { conceptMapRouter } from './routes/concept-map.js';
 import { startBackgroundWorker, stopBackgroundWorker } from './services/jobs.js';
 import { isGeminiConfigured } from './services/gemini.js';
 
@@ -54,6 +56,8 @@ app.use('/api/auth', authRouter);
 app.use('/api/attachments', attachmentsRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/quizzes', quizzesRouter);
+app.use('/api/notes', notesRouter);
+app.use('/api/concept-map', conceptMapRouter);
 
 // Health & Status Check
 app.get('/api/health', async (req: Request, res: Response) => {

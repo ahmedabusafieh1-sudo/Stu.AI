@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowLeft, CheckCircle2, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface AuthModalProps {
@@ -13,7 +13,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialEmail = '',
   onSuccess,
 }) => {
-  const { t, login, register, verifyOtp, resendOtp } = useAuth();
+  const { t, settings, setUiLanguage, login, register, verifyOtp, resendOtp } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'otp' | 'forgot' | 'reset'>(initialTab);
   const [displayName, setDisplayName] = useState('');
@@ -216,6 +216,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="w-full max-w-md bg-[#232323] border border-[#3A3A3A] rounded-2xl p-6 sm:p-8 shadow-2xl select-none">
+      {/* Language Switcher Pill */}
+      <div className="flex items-center justify-between mb-5 pb-3 border-b border-[#333333]">
+        <div className="flex items-center gap-1.5 text-xs text-[#888888]">
+          <Globe className="w-3.5 h-3.5 text-blue-400" />
+          <span>{t.uiLanguage}</span>
+        </div>
+        <div className="inline-flex p-0.5 bg-[#171717] rounded-lg border border-[#3A3A3A] text-xs">
+          <button
+            type="button"
+            onClick={() => setUiLanguage('ar')}
+            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+              settings.uiLanguage === 'ar'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-[#888888] hover:text-white'
+            }`}
+          >
+            🇸🇦 العربية
+          </button>
+          <button
+            type="button"
+            onClick={() => setUiLanguage('en')}
+            className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+              settings.uiLanguage === 'en'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-[#888888] hover:text-white'
+            }`}
+          >
+            🇺🇸 English
+          </button>
+        </div>
+      </div>
+
       {/* Branding Header */}
       <div className="text-center mb-6">
         <div className="w-12 h-12 mx-auto rounded-2xl bg-[#171717] border border-[#3A3A3A] flex items-center justify-center p-2 mb-3 shadow">

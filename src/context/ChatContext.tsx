@@ -51,10 +51,14 @@ interface ChatContextType {
   useSearchGrounding: boolean;
   quizModalOpen: boolean;
   quizInitialTopic: string;
+  notesModalOpen: boolean;
+  conceptMapOpen: boolean;
   isSidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   setUseSearchGrounding: (active: boolean) => void;
   setQuizModalOpen: (open: boolean, topic?: string) => void;
+  setNotesModalOpen: (open: boolean) => void;
+  setConceptMapOpen: (open: boolean) => void;
   selectConversation: (id: string) => Promise<void>;
   createNewConversation: () => Promise<string | null>;
   renameConversation: (id: string, newTitle: string) => Promise<void>;
@@ -82,6 +86,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [useSearchGrounding, setUseSearchGrounding] = useState(false);
   const [quizModalOpen, setQuizModalOpenState] = useState(false);
   const [quizInitialTopic, setQuizInitialTopic] = useState('');
+  const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const [conceptMapOpen, setConceptMapOpen] = useState(false);
   const [isSidebarOpen, setSidebarOpen] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 768 : true
   );
@@ -575,10 +581,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         useSearchGrounding,
         quizModalOpen,
         quizInitialTopic,
+        notesModalOpen,
+        conceptMapOpen,
         isSidebarOpen,
         setSidebarOpen,
         setUseSearchGrounding,
         setQuizModalOpen,
+        setNotesModalOpen,
+        setConceptMapOpen,
         selectConversation,
         createNewConversation,
         renameConversation,
