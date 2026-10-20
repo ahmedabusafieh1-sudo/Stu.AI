@@ -71,12 +71,22 @@ export const TopNav: React.FC = () => {
         </div>
       </div>
 
-      {/* Right Controls: Only Study Notes & "خيارات إضافية" Dropdown */}
+      {/* Right Controls: New Chat & Study Notes visible directly + Extra Options Dropdown */}
       <div className="flex items-center gap-2">
+        {/* New Chat Button - Standalone directly visible */}
+        <button
+          onClick={() => startNewChat()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-[#e5e5e5] shadow transition-colors whitespace-nowrap"
+          title={t.newChat}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>{t.newChat}</span>
+        </button>
+
         {/* Study Notes Button - Standalone directly visible */}
         <button
           onClick={() => setNotesModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm whitespace-nowrap"
           title={t.notesTitle}
         >
           <BookOpen className="w-3.5 h-3.5 text-blue-400" />
@@ -87,12 +97,12 @@ export const TopNav: React.FC = () => {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap ${
               menuOpen
                 ? 'bg-[#2E2E2E] text-white border-white/40 shadow-sm'
                 : 'bg-[#232323] hover:bg-[#2B2B2B] text-[#D5D5D5] hover:text-white border-[#3A3A3A]'
             }`}
-            title="خيارات إضافية"
+            title={t.extraOptions}
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
             <span>{t.extraOptions}</span>
@@ -106,18 +116,6 @@ export const TopNav: React.FC = () => {
           {/* Floating Dropdown Card */}
           {menuOpen && (
             <div className="absolute left-0 mt-2 w-56 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl p-1.5 shadow-2xl z-50 animate-fadeIn text-xs">
-              {/* New Chat */}
-              <button
-                onClick={() => {
-                  startNewChat();
-                  setMenuOpen(false);
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-white hover:bg-[#2B2B2B] transition-colors text-right"
-              >
-                <Plus className="w-4 h-4 text-white shrink-0" />
-                <span>{t.newChat}</span>
-              </button>
-
               {/* Concept Map */}
               <button
                 onClick={() => {
