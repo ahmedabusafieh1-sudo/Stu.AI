@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Menu,
-  Plus,
   Globe,
   HelpCircle,
   BookOpen,
@@ -17,7 +16,6 @@ export const TopNav: React.FC = () => {
   const {
     isSidebarOpen,
     setSidebarOpen,
-    startNewChat,
     useSearchGrounding,
     setUseSearchGrounding,
     setQuizModalOpen,
@@ -50,7 +48,7 @@ export const TopNav: React.FC = () => {
         <button
           onClick={() => setSidebarOpen(!isSidebarOpen)}
           className="p-2 -mr-1 rounded-lg text-[#B5B5B5] hover:text-white hover:bg-[#232323] transition-colors focus:outline-none focus:ring-1 focus:ring-white"
-          title="القائمة"
+          title="القائمة والصفحات"
           aria-label="القائمة الجانبية"
         >
           <Menu className="w-5 h-5" />
@@ -71,18 +69,8 @@ export const TopNav: React.FC = () => {
         </div>
       </div>
 
-      {/* Right Controls: New Chat & Study Notes visible directly + Extra Options Dropdown */}
+      {/* Right Controls: Only Study Notes & "خيارات إضافية" Dropdown */}
       <div className="flex items-center gap-2">
-        {/* New Chat Button - Standalone directly visible */}
-        <button
-          onClick={() => startNewChat()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-[#e5e5e5] shadow transition-colors whitespace-nowrap"
-          title={t.newChat}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>{t.newChat}</span>
-        </button>
-
         {/* Study Notes Button - Standalone directly visible */}
         <button
           onClick={() => setNotesModalOpen(true)}
@@ -102,7 +90,7 @@ export const TopNav: React.FC = () => {
                 ? 'bg-[#2E2E2E] text-white border-white/40 shadow-sm'
                 : 'bg-[#232323] hover:bg-[#2B2B2B] text-[#D5D5D5] hover:text-white border-[#3A3A3A]'
             }`}
-            title={t.extraOptions}
+            title="خيارات إضافية"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
             <span>{t.extraOptions}</span>

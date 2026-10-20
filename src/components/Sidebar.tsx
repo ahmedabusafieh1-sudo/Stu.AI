@@ -70,35 +70,36 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSettings }) => {
         />
       )}
 
-      {/* Physical Left Sidebar Drawer */}
+      {/* Sidebar Drawer */}
       <aside
-        className={`fixed md:relative top-0 bottom-0 left-0 h-full bg-[#111111] border-r border-[#3A3A3A] flex flex-col z-40 transition-all duration-300 ease-in-out overflow-hidden ${
+        className={`fixed md:relative top-0 bottom-0 start-0 h-full bg-[#111111] rtl:border-l ltr:border-r border-[#3A3A3A] flex flex-col z-40 transition-all duration-300 ease-in-out overflow-hidden ${
           isSidebarOpen
             ? 'w-72 translate-x-0 opacity-100'
-            : 'w-0 -translate-x-full opacity-0 pointer-events-none border-r-0 md:w-0'
+            : 'w-0 rtl:translate-x-full ltr:-translate-x-full opacity-0 pointer-events-none border-r-0 border-l-0 md:w-0'
         }`}
       >
         <div className="w-72 flex flex-col h-full shrink-0">
-        {/* Header: New Chat */}
-        <div className="p-3 border-b border-[#3A3A3A] flex items-center justify-between">
+        {/* Header: New Page / New Chat */}
+        <div className="p-3 border-b border-[#3A3A3A] flex items-center justify-between gap-2">
           <button
             onClick={() => {
               startNewChat();
               if (window.innerWidth < 768) setSidebarOpen(false);
             }}
-            className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-[#232323] hover:bg-[#2B2B2B] text-white text-sm font-medium border border-[#3A3A3A] transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white hover:bg-[#e5e5e5] text-black text-xs font-bold shadow-sm transition-all"
+            title="صفحة جديدة"
           >
-            <Plus className="w-4 h-4" />
-            <span>{t.newChat}</span>
+            <Plus className="w-4 h-4 text-black" />
+            <span>صفحة جديدة</span>
           </button>
 
           {/* Close drawer button on mobile */}
           <button
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden p-2 text-[#B5B5B5] hover:text-white"
+            className="md:hidden p-2 text-[#B5B5B5] hover:text-white rounded-lg hover:bg-[#232323] transition-colors"
             aria-label="إغلاق القائمة"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
