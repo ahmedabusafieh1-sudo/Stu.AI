@@ -12,16 +12,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [uiLanguage, setUiLanguage] = useState(settings.uiLanguage || 'ar');
-  const [preferredExplanationLang, setPreferredExplanationLang] = useState(
-    settings.preferredExplanationLang || 'auto'
-  );
   const [geminiKey, setGeminiKey] = useState('');
   const [isGeminiActive, setIsGeminiActive] = useState(false);
   const [geminiKeyMsg, setGeminiKeyMsg] = useState('');
   const [isSaved, setIsSaved] = useState(false);
 
+  const isAdmin = Boolean(
+    user?.email &&
+      (user.email.toLowerCase() === 'ahmed.abuassfieh1@gmail.com' ||
+        user.email.toLowerCase() === 'ahmed.abusafieh1@gmail.com')
+  );
+
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && isAdmin) {
       fetch('/api/auth/gemini-status')
         .then((res) => res.json())
         .then((data) => {
@@ -29,7 +32,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         })
         .catch(() => {});
     }
-  }, [isOpen]);
+  }, [isOpen, isAdmin]);
 
   if (!isOpen) return null;
 
@@ -38,9 +41,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     await updateSettings({
       displayName: displayName.trim() || undefined,
       uiLanguage,
-      preferredExplanationLang,
     });
-    if (geminiKey.trim()) {
+
+    if (isAdmin && geminiKey.trim()) {
       try {
         const res = await fetch('/api/auth/gemini-key', {
           method: 'POST',
@@ -58,6 +61,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         setGeminiKeyMsg(err.message);
       }
     }
+
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);
@@ -96,94 +100,71 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
           </div>
 
-          {/* Interface Language */}
+          {/* Interface Language: Arabic & English only */}
           <div>
             <label className="block text-[#B5B5B5] font-medium mb-1.5">{t.uiLanguage}</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setUiLanguage('ar')}
-                className={`py-2 px-3 rounded-xl border text-center font-medium transition-colors ${
+                className={`py-2.5 px-3 rounded-xl border text-center font-medium transition-colors ${
                   uiLanguage === 'ar'
-                    ? 'bg-white text-black border-white'
+                    ? 'bg-white text-black border-white shadow-sm'
                     : 'bg-[#171717] text-[#B5B5B5] border-[#3A3A3A] hover:text-white'
                 }`}
               >
-                العربية
+                🇸🇦 العربية
               </button>
               <button
                 type="button"
                 onClick={() => setUiLanguage('en')}
-                className={`py-2 px-3 rounded-xl border text-center font-medium transition-colors ${
+                className={`py-2.5 px-3 rounded-xl border text-center font-medium transition-colors ${
                   uiLanguage === 'en'
-                    ? 'bg-white text-black border-white'
+                    ? 'bg-white text-black border-white shadow-sm'
                     : 'bg-[#171717] text-[#B5B5B5] border-[#3A3A3A] hover:text-white'
                 }`}
               >
-                English
+                🇺🇸 English
               </button>
             </div>
           </div>
 
-          {/* Preferred Explanation Language */}
-          <div>
-            <label className="block text-[#B5B5B5] font-medium mb-1.5">{t.preferredExplanation}</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'auto', label: t.autoLang },
-                { id: 'ar', label: t.arabicLang },
-                { id: 'en', label: t.englishLang },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setPreferredExplanationLang(item.id as any)}
-                  className={`py-2 px-2 rounded-xl border text-center font-medium transition-colors ${
-                    preferredExplanationLang === item.id
-                      ? 'bg-white text-black border-white'
-                      : 'bg-[#171717] text-[#B5B5B5] border-[#3A3A3A] hover:text-white'
-                  }`}
+          {/* Google Gemini AI Key: Visible ONLY for Admin */}
+          {isAdmin && (
+            <div className="pt-3 border-t border-[#3A3A3A]">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[#B5B5B5] font-medium flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-amber-400" />
+                  <span>مفتاح الذكاء الاصطناعي (Gemini API - لوحة الإدارة)</span>
+                </label>
+                {isGeminiActive && (
+                  <span className="text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Check className="w-2.5 h-2.5" />
+                    <span>مفعل</span>
+                  </span>
+                )}
+              </div>
+              <input
+                type="password"
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                placeholder={isGeminiActive ? '•••••••••••••••••••• (أدخل مفتاحاً جديداً للتحديث)' : 'الصق مفتاح Google Gemini'}
+                className="w-full bg-[#171717] text-white px-3 py-2 rounded-xl border border-[#3A3A3A] font-mono text-xs focus:outline-none focus:border-white"
+              />
+              <div className="flex items-center justify-between mt-1 text-[11px]">
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
                 >
-                  {item.label}
-                </button>
-              ))}
+                  <ExternalLink className="w-3 h-3" />
+                  <span>لوحة مفاتيح Google AI Studio</span>
+                </a>
+                {geminiKeyMsg && <span className="text-amber-400">{geminiKeyMsg}</span>}
+              </div>
             </div>
-          </div>
-
-          {/* Google Gemini AI Key */}
-          <div className="pt-2 border-t border-[#3A3A3A]">
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[#B5B5B5] font-medium flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-amber-400" />
-                <span>مفتاح الذكاء الاصطناعي (Gemini API)</span>
-              </label>
-              {isGeminiActive && (
-                <span className="text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <Check className="w-2.5 h-2.5" />
-                  <span>مفعل</span>
-                </span>
-              )}
-            </div>
-            <input
-              type="password"
-              value={geminiKey}
-              onChange={(e) => setGeminiKey(e.target.value)}
-              placeholder={isGeminiActive ? '•••••••••••••••••••• (أدخل مفتاحاً جديداً للتحديث)' : 'الصق مفتاح Google Gemini (AIza...)'}
-              className="w-full bg-[#171717] text-white px-3 py-2 rounded-xl border border-[#3A3A3A] font-mono text-xs focus:outline-none focus:border-white"
-            />
-            <div className="flex items-center justify-between mt-1 text-[11px]">
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
-              >
-                <ExternalLink className="w-3 h-3" />
-                <span>احصل على مفتاح مجاني من Google</span>
-              </a>
-              {geminiKeyMsg && <span className="text-amber-400">{geminiKeyMsg}</span>}
-            </div>
-          </div>
+          )}
 
           {/* Action Buttons */}
           <div className="pt-3 border-t border-[#3A3A3A] flex items-center justify-between">

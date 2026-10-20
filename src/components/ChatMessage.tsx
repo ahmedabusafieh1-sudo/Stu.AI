@@ -192,7 +192,7 @@ function formatInlineText(text: string, keyPrefix: string): React.ReactNode {
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
-  const { t } = useAuth();
+  const { t, user } = useAuth();
   const { sendMessage, retryLastMessage, setQuizModalOpen } = useChat();
   const [copied, setCopied] = useState(false);
   const [inputKey, setInputKey] = useState('');
@@ -200,9 +200,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const [keyError, setKeyError] = useState('');
   const [keySuccess, setKeySuccess] = useState(false);
 
+  const isAdmin = Boolean(
+    user?.email &&
+      (user.email.toLowerCase() === 'ahmed.abuassfieh1@gmail.com' ||
+        user.email.toLowerCase() === 'ahmed.abusafieh1@gmail.com')
+  );
+
   const isUser = message.role === 'user';
   const isFailed = message.status === 'failed';
   const isGeminiMissing =
+    isAdmin &&
     isFailed &&
     (message.content.includes('GEMINI_API_KEY') ||
       message.content.includes('غير مضبوطة') ||

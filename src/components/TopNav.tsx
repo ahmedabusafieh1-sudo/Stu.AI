@@ -44,61 +44,62 @@ export const TopNav: React.FC = () => {
         </div>
       </div>
 
-      {/* Right Controls: Google Search Grounding toggle, Quiz shortcut, New Chat */}
-      <div className="flex items-center gap-2">
-        {/* Google Search Toggle */}
-        <button
-          onClick={() => setUseSearchGrounding(!useSearchGrounding)}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            useSearchGrounding
-              ? 'bg-blue-900/30 text-blue-300 border-blue-500/50 shadow-sm'
-              : 'bg-[#232323] text-[#B5B5B5] border-[#3A3A3A] hover:text-white'
-          }`}
-          title="تفعيل/تعطيل بحث Google للحقائق المستجدة"
-        >
-          <Globe className={`w-3.5 h-3.5 ${useSearchGrounding ? 'text-blue-400 animate-pulse' : ''}`} />
-          <span className="hidden sm:inline">{t.googleSearch}</span>
-        </button>
+      {/* Right Controls: Horizontally scrollable and swipeable on mobile */}
+      <div className="flex-1 flex items-center justify-end overflow-x-auto no-scrollbar scroll-smooth min-w-0 pr-1 pl-2">
+        <div className="flex items-center gap-2 shrink-0 flex-nowrap py-1">
+          {/* Google Search Toggle */}
+          <button
+            onClick={() => setUseSearchGrounding(!useSearchGrounding)}
+            className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap ${
+              useSearchGrounding
+                ? 'bg-blue-900/30 text-blue-300 border-blue-500/50 shadow-sm'
+                : 'bg-[#232323] text-[#B5B5B5] border-[#3A3A3A] hover:text-white'
+            }`}
+            title="تفعيل/تعطيل بحث Google للحقائق المستجدة"
+          >
+            <Globe className={`w-3.5 h-3.5 ${useSearchGrounding ? 'text-blue-400 animate-pulse' : ''}`} />
+            <span className="inline">{t.googleSearch}</span>
+          </button>
 
-        {/* Study Notes Button */}
-        <button
-          onClick={() => setNotesModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm"
-          title={t.notesTitle}
-        >
-          <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-          <span>{t.notesButton}</span>
-        </button>
+          {/* Study Notes Button */}
+          <button
+            onClick={() => setNotesModalOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm whitespace-nowrap"
+            title={t.notesTitle}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+            <span>{t.notesButton}</span>
+          </button>
 
-        {/* Concept Map Button */}
-        <button
-          onClick={() => setConceptMapOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm"
-          title={t.conceptMapTitle}
-        >
-          <Network className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">{t.conceptMapButton}</span>
-          <span className="sm:hidden">خريطة</span>
-        </button>
+          {/* Concept Map Button */}
+          <button
+            onClick={() => setConceptMapOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm whitespace-nowrap"
+            title={t.conceptMapTitle}
+          >
+            <Network className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{t.conceptMapButton}</span>
+          </button>
 
-        {/* Quiz Button */}
-        <button
-          onClick={() => setQuizModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors"
-          title="إنشاء كويز تفاعلي من مصادرك"
-        >
-          <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-          <span>{t.quizButton}</span>
-        </button>
+          {/* Quiz Button */}
+          <button
+            onClick={() => setQuizModalOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors whitespace-nowrap"
+            title="إنشاء كويز تفاعلي من مصادرك"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+            <span>{t.quizButton}</span>
+          </button>
 
-        {/* New Chat Button */}
-        <button
-          onClick={() => startNewChat()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-[#e5e5e5] shadow transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">{t.newChat}</span>
-        </button>
+          {/* New Chat Button */}
+          <button
+            onClick={() => startNewChat()}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-[#e5e5e5] shadow transition-colors whitespace-nowrap"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{t.newChat}</span>
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -57,6 +57,15 @@
   padding: 4px 0;
 }
 
+/* Utility to hide scrollbars while preserving touch swipe */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Strict BiDi Isolation for Code and Hyphenated English Terms in RTL */
 [dir="rtl"] code,
 [dir="rtl"] .isolate-bidi,

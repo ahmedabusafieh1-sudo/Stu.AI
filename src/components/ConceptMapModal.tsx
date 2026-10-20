@@ -2,15 +2,12 @@ import React, { useState, useRef } from 'react';
 import {
   X,
   Download,
-  Share2,
   Upload,
   Image as ImageIcon,
-  FileText,
   Loader2,
   Sparkles,
   ArrowRight,
   RefreshCw,
-  Layers,
   Network,
   CheckCircle2,
 } from 'lucide-react';
@@ -45,10 +42,10 @@ interface ConceptMapData {
 
 export const ConceptMapModal: React.FC = () => {
   const { t, settings } = useAuth();
-  const { conceptMapOpen, setConceptMapOpen, pendingAttachments } = useChat();
+  const { conceptMapOpen, setConceptMapOpen } = useChat();
 
-  const [topic, setTopic] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [notes, setNotes] = useState('');
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [conceptMap, setConceptMap] = useState<ConceptMapData | null>(null);
@@ -59,19 +56,24 @@ export const ConceptMapModal: React.FC = () => {
 
   if (!conceptMapOpen) return null;
 
-  const handleFilesAdded = (files: FileList | null) => {
+  const handleImagesAdded = (files: FileList | null) => {
     if (!files) return;
-    const list = Array.from(files);
-    setSelectedFiles((prev) => [...prev, ...list]);
+    const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (list.length === 0) {
+      setErrorMessage('يرجى اختيار ملفات صور فقط (JPG, PNG, WebP).');
+      return;
+    }
+    setErrorMessage(null);
+    setSelectedImages((prev) => [...prev, ...list]);
   };
 
-  const removeSelectedFile = (idx: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+  const removeSelectedImage = (idx: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleGenerate = async () => {
-    if (selectedFiles.length === 0 && !topic.trim()) {
-      setErrorMessage('يرجى كتابة موضوع الدرس أو إرفاق صورة/ملف للبدء.');
+    if (selectedImages.length === 0) {
+      setErrorMessage('يرجى رفع الصور التي تريد أن تعمل منها خريطة مفاهيم أولاً.');
       return;
     }
 
@@ -80,10 +82,10 @@ export const ConceptMapModal: React.FC = () => {
 
     try {
       const formData = new FormData();
-      formData.append('topic', topic.trim());
+      formData.append('topic', notes.trim());
       formData.append('language', settings.uiLanguage || 'ar');
 
-      selectedFiles.forEach((f) => {
+      selectedImages.forEach((f) => {
         formData.append('files', f);
       });
 
@@ -247,9 +249,9 @@ export const ConceptMapModal: React.FC = () => {
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-3 shadow">
                   <Network className="w-7 h-7" />
                 </div>
-                <h2 className="text-xl font-bold text-white">إنشاء خريطة مفاهيم ذكية</h2>
-                <p className="text-xs text-[#999999] mt-1.5 max-w-md mx-auto leading-relaxed">
-                  ارفع صور الدروس أو صفحات الكتب أو الملفات، أو اكتب موضوع الدرس لإنشاء خريطة ترابطية سريعة ودقيقة يمكنك تنزيلها وحفظها في صور هاتفك.
+                <h2 className="text-xl font-bold text-white">ارفع الصور التي تريد أن تعمل منها خريطة مفاهيم</h2>
+                <p className="text-xs text-[#999999] mt-2 max-w-lg mx-auto leading-relaxed">
+                  بناءً على الصور وباستخدام الذكاء الاصطناعي (AI)، سيتم إنشاء خريطة مفاهيم واضحة، مفهومة وصحيحة تربط المعلومات والمحاور ببعضها بدقة.
                 </p>
               </div>
 
@@ -260,66 +262,45 @@ export const ConceptMapModal: React.FC = () => {
               )}
 
               <div className="space-y-4">
-                {/* Topic Input */}
+                {/* Images Upload Zone - Strictly Photos */}
                 <div>
-                  <label className="block text-xs font-semibold text-[#D5D5D5] mb-1.5">
-                    موضوع الدرس أو عنوان الخريطة (اختياري عند إرفاق صور)
-                  </label>
-                  <input
-                    type="text"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="مثال: الجدول الدوري للعناصر، قوانين كبلر، علم الوراثة، أزمنة الإنجليزية..."
-                    className="w-full bg-[#202020] text-sm text-white px-3.5 py-2.5 rounded-xl border border-[#3A3A3A] focus:outline-none focus:border-emerald-500 placeholder-[#666666]"
-                    dir="auto"
-                  />
-                </div>
-
-                {/* Upload Zone */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#D5D5D5] mb-1.5">
-                    إرفاق صور أو ملفات للشرح منها (صور صفحات الكتاب، ملازم، PDF)
-                  </label>
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-[#3A3A3A] hover:border-emerald-500/60 rounded-xl p-5 text-center cursor-pointer bg-[#202020]/60 hover:bg-[#202020] transition-all"
+                    className="border-2 border-dashed border-[#3A3A3A] hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer bg-[#202020]/60 hover:bg-[#202020] transition-all"
                   >
                     <input
                       ref={fileInputRef}
                       type="file"
                       multiple
-                      accept="image/*,.pdf,.doc,.docx,.txt"
-                      onChange={(e) => handleFilesAdded(e.target.files)}
+                      accept="image/*"
+                      onChange={(e) => handleImagesAdded(e.target.files)}
                       className="hidden"
                     />
-                    <Upload className="w-7 h-7 text-emerald-400 mx-auto mb-2" />
-                    <p className="text-xs font-medium text-white">اضغط لاختيار صور من هاتفك أو اسحب الملفات هنا</p>
-                    <p className="text-[11px] text-[#777777] mt-1">يدعم الصور (JPG, PNG) وملفات PDF والكتب الدراسية</p>
+                    <Upload className="w-8 h-8 text-emerald-400 mx-auto mb-2.5" />
+                    <p className="text-sm font-semibold text-white">اضغط لاختيار الصور من هاتفك أو جهازك</p>
+                    <p className="text-xs text-[#777777] mt-1">يدعم جميع صيغ الصور (JPG, PNG, WebP)</p>
                   </div>
                 </div>
 
-                {/* Selected Files Preview List */}
-                {selectedFiles.length > 0 && (
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                    {selectedFiles.map((f, i) => (
+                {/* Selected Images Preview List */}
+                {selectedImages.length > 0 && (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    {selectedImages.map((f, i) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between p-2 rounded-lg bg-[#252525] border border-[#3A3A3A] text-xs"
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-[#252525] border border-[#3A3A3A] text-xs"
                       >
-                        <div className="flex items-center gap-2 truncate">
-                          {f.type.startsWith('image/') ? (
-                            <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />
-                          ) : (
-                            <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-                          )}
-                          <span className="truncate text-white text-[12px]">{f.name}</span>
+                        <div className="flex items-center gap-2.5 truncate">
+                          <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span className="truncate text-white text-[13px] font-medium">{f.name}</span>
                           <span className="text-[10px] text-[#777777]">
                             ({(f.size / 1024).toFixed(0)} KB)
                           </span>
                         </div>
                         <button
-                          onClick={() => removeSelectedFile(i)}
+                          onClick={() => removeSelectedImage(i)}
                           className="text-[#888888] hover:text-red-400 p-1"
+                          title="حذف الصورة"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -328,21 +309,36 @@ export const ConceptMapModal: React.FC = () => {
                   </div>
                 )}
 
+                {/* Optional Description / Notes without examples */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#D5D5D5] mb-1.5">
+                    وصف أو ملاحظات إضافية على الصور (اختياري)
+                  </label>
+                  <input
+                    type="text"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="اكتب أي ملاحظة أو تفاصيل ترغب بالتركيز عليها..."
+                    className="w-full bg-[#202020] text-sm text-white px-3.5 py-2.5 rounded-xl border border-[#3A3A3A] focus:outline-none focus:border-emerald-500 placeholder-[#666666]"
+                    dir="auto"
+                  />
+                </div>
+
                 {/* Submit Button */}
                 <button
                   onClick={handleGenerate}
-                  disabled={isGenerating}
+                  disabled={isGenerating || selectedImages.length === 0}
                   className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-sm shadow-lg flex items-center justify-center gap-2 transition-all mt-4"
                 >
                   {isGenerating ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>جاري استخراج وتحليل المفاهيم ورسم الخريطة...</span>
+                      <span>جاري قراءة الصور وبناء خريطة المفاهيم بالذكاء الاصطناعي...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>توليد خريطة المفاهيم الآن</span>
+                      <span>توليد خريطة المفاهيم من الصور</span>
                     </>
                   )}
                 </button>
