@@ -1,5 +1,14 @@
-import React from 'react';
-import { Menu, Plus, Globe, HelpCircle, BookOpen, Network } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Menu,
+  Plus,
+  Globe,
+  HelpCircle,
+  BookOpen,
+  Network,
+  ChevronDown,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 
@@ -16,8 +25,26 @@ export const TopNav: React.FC = () => {
     setConceptMapOpen,
   } = useChat();
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [menuOpen]);
+
   return (
-    <header className="h-14 border-b border-[#3A3A3A] bg-[#171717] px-4 flex items-center justify-between select-none z-20 shrink-0">
+    <header className="h-14 border-b border-[#3A3A3A] bg-[#171717] px-3 sm:px-4 flex items-center justify-between select-none z-20 shrink-0 relative">
       {/* Left: ☰ Menu button & Logo */}
       <div className="flex items-center gap-3">
         <button
@@ -44,61 +71,106 @@ export const TopNav: React.FC = () => {
         </div>
       </div>
 
-      {/* Right Controls: Horizontally scrollable and swipeable on mobile */}
-      <div className="flex-1 flex items-center justify-end overflow-x-auto no-scrollbar scroll-smooth min-w-0 pr-1 pl-2">
-        <div className="flex items-center gap-2 shrink-0 flex-nowrap py-1">
-          {/* Google Search Toggle */}
+      {/* Right Controls: Only Study Notes & "خيارات إضافية" Dropdown */}
+      <div className="flex items-center gap-2">
+        {/* Study Notes Button - Standalone directly visible */}
+        <button
+          onClick={() => setNotesModalOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm"
+          title={t.notesTitle}
+        >
+          <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+          <span>{t.notesButton}</span>
+        </button>
+
+        {/* Extra Options Dropdown Menu */}
+        <div className="relative" ref={dropdownRef}>
           <button
-            onClick={() => setUseSearchGrounding(!useSearchGrounding)}
-            className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap ${
-              useSearchGrounding
-                ? 'bg-blue-900/30 text-blue-300 border-blue-500/50 shadow-sm'
-                : 'bg-[#232323] text-[#B5B5B5] border-[#3A3A3A] hover:text-white'
+            onClick={() => setMenuOpen(!menuOpen)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              menuOpen
+                ? 'bg-[#2E2E2E] text-white border-white/40 shadow-sm'
+                : 'bg-[#232323] hover:bg-[#2B2B2B] text-[#D5D5D5] hover:text-white border-[#3A3A3A]'
             }`}
-            title="تفعيل/تعطيل بحث Google للحقائق المستجدة"
+            title="خيارات إضافية"
           >
-            <Globe className={`w-3.5 h-3.5 ${useSearchGrounding ? 'text-blue-400 animate-pulse' : ''}`} />
-            <span className="inline">{t.googleSearch}</span>
+            <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{t.extraOptions}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-[#888888] transition-transform duration-200 ${
+                menuOpen ? 'rotate-180' : ''
+              }`}
+            />
           </button>
 
-          {/* Study Notes Button */}
-          <button
-            onClick={() => setNotesModalOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm whitespace-nowrap"
-            title={t.notesTitle}
-          >
-            <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-            <span>{t.notesButton}</span>
-          </button>
+          {/* Floating Dropdown Card */}
+          {menuOpen && (
+            <div className="absolute left-0 mt-2 w-56 bg-[#1F1F1F] border border-[#3A3A3A] rounded-2xl p-1.5 shadow-2xl z-50 animate-fadeIn text-xs">
+              {/* New Chat */}
+              <button
+                onClick={() => {
+                  startNewChat();
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-white hover:bg-[#2B2B2B] transition-colors text-right"
+              >
+                <Plus className="w-4 h-4 text-white shrink-0" />
+                <span>{t.newChat}</span>
+              </button>
 
-          {/* Concept Map Button */}
-          <button
-            onClick={() => setConceptMapOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors shadow-sm whitespace-nowrap"
-            title={t.conceptMapTitle}
-          >
-            <Network className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{t.conceptMapButton}</span>
-          </button>
+              {/* Concept Map */}
+              <button
+                onClick={() => {
+                  setConceptMapOpen(true);
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-[#E5E5E5] hover:text-white hover:bg-[#2B2B2B] transition-colors text-right"
+              >
+                <Network className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{t.conceptMapButton}</span>
+              </button>
 
-          {/* Quiz Button */}
-          <button
-            onClick={() => setQuizModalOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#232323] hover:bg-[#2B2B2B] text-[#F5F5F5] border border-[#3A3A3A] transition-colors whitespace-nowrap"
-            title="إنشاء كويز تفاعلي من مصادرك"
-          >
-            <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-            <span>{t.quizButton}</span>
-          </button>
+              {/* Quiz */}
+              <button
+                onClick={() => {
+                  setQuizModalOpen(true);
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-[#E5E5E5] hover:text-white hover:bg-[#2B2B2B] transition-colors text-right"
+              >
+                <HelpCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>{t.quizButton}</span>
+              </button>
 
-          {/* New Chat Button */}
-          <button
-            onClick={() => startNewChat()}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-[#e5e5e5] shadow transition-colors whitespace-nowrap"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{t.newChat}</span>
-          </button>
+              <div className="h-px bg-[#333333] my-1" />
+
+              {/* Google Search Toggle */}
+              <button
+                onClick={() => {
+                  setUseSearchGrounding(!useSearchGrounding);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-[#E5E5E5] hover:text-white hover:bg-[#2B2B2B] transition-colors text-right"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Globe
+                    className={`w-4 h-4 shrink-0 ${
+                      useSearchGrounding ? 'text-blue-400 animate-pulse' : 'text-[#888888]'
+                    }`}
+                  />
+                  <span>{t.googleSearch}</span>
+                </div>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                    useSearchGrounding
+                      ? 'bg-blue-950 text-blue-300 border border-blue-700/60'
+                      : 'bg-[#2A2A2A] text-[#777777]'
+                  }`}
+                >
+                  {useSearchGrounding ? 'مفعل' : 'معطل'}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
